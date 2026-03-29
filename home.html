@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FitLog — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0a0a0a;
+    --charcoal: #141414;
+    --card: #1c1c1c;
+    --border: #2a2a2a;
+    --green: #b8f94f;
+    --text: #e8e8e8;
+    --muted: #888;
+    --red: #ff5252;
+    --blue: #4fa8ff;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── NAVBAR ── */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--green);
+  }
+
+  .logo span { color: var(--text); }
+
+  nav ul {
+    list-style: none;
+    display: flex;
+    gap: 32px;
+  }
+
+  nav ul li a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+  }
+
+  nav ul li a:hover { color: var(--text); }
+  nav ul li a.active { color: var(--text); }
+
+  .nav-actions { display: flex; gap: 12px; align-items: center; }
+
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.2s;
+  }
+
+  .btn-ghost:hover { border-color: var(--muted); }
+
+  .btn-primary {
+    background: var(--green);
+    border: none;
+    color: var(--black);
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .btn-primary:hover { opacity: 0.9; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex;
+    justify-content: space-around;
+    padding: 22px 40px;
+    border-bottom: 1px solid var(--border);
+    background: var(--charcoal);
+  }
+
+  .stat-item { text-align: center; }
+
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 34px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: grid;
+    grid-template-columns: 220px 1fr 280px;
+    min-height: calc(100vh - 120px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin: 16px 0 6px 10px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .sidebar-item.active {
+    background: rgba(184,249,79,0.1);
+    color: var(--green);
+  }
+
+  .sidebar-item:hover:not(.active) {
+    background: var(--card);
+    color: var(--text);
+  }
+
+  .icon { font-size: 15px; width: 20px; text-align: center; }
+
+  /* ── CENTER CONTENT ── */
+  .content {
+    padding: 28px 32px;
+    overflow-y: auto;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1.5px;
+    color: var(--text);
+  }
+
+  /* ── WORKOUT TABLE ── */
+  .workout-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .workout-table th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+
+  .workout-table td {
+    padding: 14px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  .workout-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge-green { background: rgba(184,249,79,0.15); color: var(--green); }
+  .badge-blue  { background: rgba(79,168,255,0.15); color: var(--blue); }
+  .badge-red   { background: rgba(255,82,82,0.15);  color: var(--red); }
+
+  /* ── VOLUME CHART ── */
+  .chart-section { margin-top: 36px; }
+
+  .chart-bars {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    height: 90px;
+    margin-top: 16px;
+  }
+
+  .chart-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .chart-bar {
+    width: 100%;
+    max-width: 40px;
+    border-radius: 4px 4px 0 0;
+    background: var(--green);
+    opacity: 0.75;
+    transition: opacity 0.2s;
+  }
+
+  .chart-bar:hover { opacity: 1; }
+  .chart-bar.empty { background: var(--border); opacity: 1; }
+
+  .chart-day {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* Circular progress rings */
+  .circles-row { display: flex; gap: 12px; justify-content: center; }
+
+  .circle-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+  .circle {
+    width: 68px; height: 68px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .circle::after {
+    content: '';
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: var(--card);
+    position: absolute;
+  }
+
+  .circle-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px;
+    color: var(--green);
+    position: relative;
+    z-index: 1;
+  }
+
+  .circle-label { font-size: 11px; color: var(--muted); }
+
+  /* Progress bars */
+  .prog-row { margin-bottom: 14px; }
+
+  .prog-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .prog-meta strong { color: var(--text); font-weight: 500; }
+
+  .prog-bar {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .prog-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+  }
+
+  /* Last workout card */
+  .recent-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .recent-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .recent-meta  { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+
+  .mini-stats { display: flex; gap: 20px; }
+
+  .mini-stat .val {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: var(--green);
+  }
+
+  .mini-stat .lbl {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="logo">FIT<span>LOG</span></div>
+  <ul>
+    <li><a href="home.html" class="active">Dashboard</a></li>
+    <li><a href="#">History</a></li>
+    <li><a href="#">Progress</a></li>
+    <li><a href="#">Admin</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a class="btn-ghost" href="login.html">Log Out</a>
+    <button class="btn-primary">+ Log Workout</button>
+  </div>
+</nav>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num">48</div>
+    <div class="stat-label">Total Workouts</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">12,450</div>
+    <div class="stat-label">Total Volume (lbs)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">6</div>
+    <div class="stat-label">Week Streak</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">3</div>
+    <div class="stat-label">This Week</div>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <a class="sidebar-item active" href="home.html"><span class="icon">🏠</span> Dashboard</a>
+    <a class="sidebar-item" href="#"><span class="icon">➕</span> Log Workout</a>
+
+    <div class="sidebar-label">Tracking</div>
+    <a class="sidebar-item" href="#"><span class="icon">📋</span> History</a>
+    <a class="sidebar-item" href="#"><span class="icon">📈</span> Progress</a>
+    <a class="sidebar-item" href="#"><span class="icon">🏆</span> Personal Records</a>
+
+    <div class="sidebar-label">Account</div>
+    <a class="sidebar-item" href="#"><span class="icon">👤</span> Profile</a>
+    <a class="sidebar-item" href="#"><span class="icon">⚙️</span> Settings</a>
+    <a class="sidebar-item" href="#"><span class="icon">🛡️</span> Admin Panel</a>
+  </div>
+
+  <!-- CENTER CONTENT -->
+  <div class="content">
+    <div class="section-header">
+      <div class="section-title">Recent Workouts</div>
+      <button class="btn-ghost">View All</button>
+    </div>
+
+    <table class="workout-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Exercise</th>
+          <th>Sets &times; Reps</th>
+          <th>Weight</th>
+          <th>Volume</th>
+          <th>Progress</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Mar 28</td>
+          <td><strong>Bench Press</strong></td>
+          <td>4 &times; 8</td>
+          <td>185 lbs</td>
+          <td>5,920 lbs</td>
+          <td><span class="badge badge-green">&#8593; PR</span></td>
+        </tr>
+        <tr>
+          <td>Mar 28</td>
+          <td><strong>Squat</strong></td>
+          <td>5 &times; 5</td>
+          <td>225 lbs</td>
+          <td>5,625 lbs</td>
+          <td><span class="badge badge-blue">&#9654; Same</span></td>
+        </tr>
+        <tr>
+          <td>Mar 26</td>
+          <td><strong>Deadlift</strong></td>
+          <td>3 &times; 5</td>
+          <td>315 lbs</td>
+          <td>4,725 lbs</td>
+          <td><span class="badge badge-green">&#8593; +10</span></td>
+        </tr>
+        <tr>
+          <td>Mar 25</td>
+          <td><strong>Overhead Press</strong></td>
+          <td>4 &times; 6</td>
+          <td>115 lbs</td>
+          <td>2,760 lbs</td>
+          <td><span class="badge badge-red">&#8595; &minus;5</span></td>
+        </tr>
+        <tr>
+          <td>Mar 23</td>
+          <td><strong>Pull-Up</strong></td>
+          <td>3 &times; 10</td>
+          <td>BW+25</td>
+          <td>&mdash;</td>
+          <td><span class="badge badge-green">&#8593; +2 reps</span></td>
+        </tr>
+        <tr>
+          <td>Mar 21</td>
+          <td><strong>Romanian Deadlift</strong></td>
+          <td>3 &times; 8</td>
+          <td>185 lbs</td>
+          <td>4,440 lbs</td>
+          <td><span class="badge badge-blue">&#9654; Same</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Weekly Volume Chart -->
+    <div class="chart-section">
+      <div class="section-title" style="font-size:18px;">Volume This Week</div>
+      <div class="chart-bars">
+        <div class="chart-col">
+          <div class="chart-bar empty" style="height:24px;"></div>
+          <span class="chart-day">Mon</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar" style="height:55px;"></div>
+          <span class="chart-day">Tue</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar empty" style="height:16px;"></div>
+          <span class="chart-day">Wed</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar" style="height:72px;"></div>
+          <span class="chart-day">Thu</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar" style="height:44px;"></div>
+          <span class="chart-day">Fri</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar empty" style="height:10px;"></div>
+          <span class="chart-day">Sat</span>
+        </div>
+        <div class="chart-col">
+          <div class="chart-bar" style="height:62px;"></div>
+          <span class="chart-day">Sun</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- Weekly Goals -->
+    <div>
+      <div class="panel-title">Weekly Goals</div>
+      <div class="circles-row">
+        <div class="circle-wrap">
+          <div class="circle" style="background: conic-gradient(var(--green) 0% 72%, var(--border) 72% 100%)">
+            <span class="circle-text">72%</span>
+          </div>
+          <span class="circle-label">Workouts</span>
+        </div>
+        <div class="circle-wrap">
+          <div class="circle" style="background: conic-gradient(var(--blue) 0% 50%, var(--border) 50% 100%)">
+            <span class="circle-text" style="color:var(--blue)">50%</span>
+          </div>
+          <span class="circle-label">Volume</span>
+        </div>
+        <div class="circle-wrap">
+          <div class="circle" style="background: conic-gradient(var(--green) 0% 88%, var(--border) 88% 100%)">
+            <span class="circle-text">88%</span>
+          </div>
+          <span class="circle-label">Streak</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Lifts vs PR -->
+    <div>
+      <div class="panel-title">Top Lifts vs PR</div>
+      <div class="prog-row">
+        <div class="prog-meta"><strong>Bench Press</strong><span>185 / 210 lbs</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:88%"></div></div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-meta"><strong>Squat</strong><span>225 / 275 lbs</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:82%"></div></div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-meta"><strong>Deadlift</strong><span>315 / 365 lbs</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:86%;background:var(--blue)"></div></div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-meta"><strong>OHP</strong><span>115 / 145 lbs</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:79%"></div></div>
+      </div>
+    </div>
+
+    <!-- Last Workout -->
+    <div>
+      <div class="panel-title">Last Workout</div>
+      <div class="recent-card">
+        <div class="recent-title">Push Day A</div>
+        <div class="recent-meta">Mar 28, 2026 &middot; 58 min</div>
+        <div class="mini-stats">
+          <div class="mini-stat">
+            <span class="val">4</span>
+            <span class="lbl">Exercises</span>
+          </div>
+          <div class="mini-stat">
+            <span class="val">17</span>
+            <span class="lbl">Sets</span>
+          </div>
+          <div class="mini-stat">
+            <span class="val">8,680</span>
+            <span class="lbl">Volume lbs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
