@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FitLog — Create Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0a0a0a;
+    --charcoal: #141414;
+    --card: #1c1c1c;
+    --border: #2a2a2a;
+    --green: #b8f94f;
+    --text: #e8e8e8;
+    --muted: #777;
+    --red: #ff5252;
+    --blue: #4fa8ff;
+  }
+
+  body {
+    background: var(--black);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background-image: radial-gradient(ellipse at 80% 20%, rgba(79,168,255,0.05) 0%, transparent 50%),
+                      radial-gradient(ellipse at 20% 80%, rgba(184,249,79,0.03) 0%, transparent 50%);
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 460px;
+    padding: 48px 40px;
+    background: var(--charcoal);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px;
+    letter-spacing: 5px;
+    color: var(--green);
+    margin-bottom: 4px;
+  }
+
+  .logo span { color: var(--text); }
+
+  .tagline {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 32px;
+  }
+
+  .auth-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 2px;
+    color: var(--text);
+    margin-bottom: 24px;
+  }
+
+  .name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .field-group {
+    margin-bottom: 18px;
+    position: relative;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+
+  .field-input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 40px 12px 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .field-input:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(184,249,79,0.1);
+  }
+
+  .field-input.valid { border-color: var(--green); }
+  .field-input.invalid { border-color: var(--red); }
+
+  .field-icon {
+    position: absolute;
+    right: 14px;
+    bottom: 13px;
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .strength-meter {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .strength-seg {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+
+  .strength-seg.low  { background: var(--red); }
+  .strength-seg.med  { background: #ffd740; }
+  .strength-seg.high { background: var(--green); }
+
+  .strength-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  .terms-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 22px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .terms-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    accent-color: var(--green);
+    cursor: pointer;
+  }
+
+  .terms-row a { color: var(--blue); text-decoration: none; }
+
+  .btn-main {
+    width: 100%;
+    background: var(--green);
+    border: none;
+    color: var(--black);
+    padding: 14px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    margin-bottom: 20px;
+    transition: opacity 0.2s;
+  }
+
+  .btn-main:hover { opacity: 0.9; }
+
+  .switch-link {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .switch-link a { color: var(--green); text-decoration: none; font-weight: 600; }
+  .switch-link a:hover { text-decoration: underline; }
+
+  .error-box {
+    display: none;
+    padding: 12px 14px;
+    background: rgba(255,82,82,0.08);
+    border: 1px solid rgba(255,82,82,0.25);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--red);
+    margin-bottom: 20px;
+  }
+
+  .success-box {
+    display: none;
+    padding: 12px 14px;
+    background: rgba(184,249,79,0.08);
+    border: 1px solid rgba(184,249,79,0.25);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--green);
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-card">
+  <div class="logo">FIT<span>LOG</span></div>
+  <div class="tagline">Start tracking. Stay consistent.</div>
+
+  <div class="auth-title">Create Account</div>
+
+  <div class="error-box" id="error-box"></div>
+  <div class="success-box" id="success-box">Account created! Check your email to verify.</div>
+
+  <form id="register-form" onsubmit="return false;">
+    <div class="name-row">
+      <div class="field-group">
+        <label class="field-label" for="first-name">First Name</label>
+        <input class="field-input" id="first-name" type="text" placeholder="First" autocomplete="given-name">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="last-name">Last Name</label>
+        <input class="field-input" id="last-name" type="text" placeholder="Last" autocomplete="family-name">
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="email">Email Address</label>
+      <input class="field-input" id="email" type="email" placeholder="you@example.com" autocomplete="email">
+      <span class="field-icon">✉</span>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="password">Create Password</label>
+      <input class="field-input" id="password" type="password" placeholder="Min. 8 characters" autocomplete="new-password" oninput="checkStrength(this.value)">
+      <span class="field-icon">🔒</span>
+      <div class="strength-meter">
+        <div class="strength-seg" id="seg1"></div>
+        <div class="strength-seg" id="seg2"></div>
+        <div class="strength-seg" id="seg3"></div>
+        <div class="strength-seg" id="seg4"></div>
+      </div>
+      <div class="strength-label" id="strength-label">Enter a password</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="confirm-password">Confirm Password</label>
+      <input class="field-input" id="confirm-password" type="password" placeholder="Repeat password" autocomplete="new-password">
+      <span class="field-icon" id="confirm-icon" style="color:var(--muted)">🔒</span>
+    </div>
+
+    <label class="terms-row">
+      <input type="checkbox" id="terms">
+      <span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span>
+    </label>
+
+    <button class="btn-main" type="submit" onclick="handleRegister()">Create My Account</button>
+  </form>
+
+  <div class="switch-link">
+    Already have an account? <a href="login.html">Sign in &rarr;</a>
+  </div>
+</div>
+
+<script>
+  function checkStrength(val) {
+    const segs = [
+      document.getElementById('seg1'),
+      document.getElementById('seg2'),
+      document.getElementById('seg3'),
+      document.getElementById('seg4'),
+    ];
+    const label = document.getElementById('strength-label');
+
+    segs.forEach(s => { s.className = 'strength-seg'; });
+
+    if (val.length === 0) {
+      label.textContent = 'Enter a password';
+      return;
+    }
+
+    let score = 0;
+    if (val.length >= 8) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const cls = score <= 1 ? 'low' : score <= 2 ? 'med' : 'high';
+    const labels = ['', 'Weak', 'Weak', 'Good', 'Strong'];
+
+    for (let i = 0; i < score; i++) segs[i].classList.add(cls);
+    label.textContent = 'Password strength: ' + (labels[score] || 'Weak');
+  }
+
+  function handleRegister() {
+    const firstName = document.getElementById('first-name').value.trim();
+    const lastName = document.getElementById('last-name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    const terms = document.getElementById('terms').checked;
+    const errorBox = document.getElementById('error-box');
+    const successBox = document.getElementById('success-box');
+
+    errorBox.style.display = 'none';
+    successBox.style.display = 'none';
+
+    if (!firstName || !lastName) {
+      errorBox.textContent = 'Please enter your first and last name.';
+      errorBox.style.display = 'block';
+      return;
+    }
+    if (!email) {
+      errorBox.textContent = 'Please enter a valid email address.';
+      errorBox.style.display = 'block';
+      return;
+    }
+    if (password.length < 8) {
+      errorBox.textContent = 'Password must be at least 8 characters.';
+      errorBox.style.display = 'block';
+      return;
+    }
+    if (password !== confirm) {
+      errorBox.textContent = 'Passwords do not match.';
+      errorBox.style.display = 'block';
+      return;
+    }
+    if (!terms) {
+      errorBox.textContent = 'You must agree to the Terms of Service.';
+      errorBox.style.display = 'block';
+      return;
+    }
+
+    successBox.style.display = 'block';
+    setTimeout(() => { window.location.href = 'home.html'; }, 1500);
+  }
+</script>
+
+</body>
+</html>
