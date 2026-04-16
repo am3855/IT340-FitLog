@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, session, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
-from botocore.exceptions import ClientError
-import boto3
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 import uuid
 import os
 import re
@@ -9,58 +9,39 @@ import re
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fitlog-dev-secret-key')
 
-# Session configuration for security
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
-TABLE_NAME = 'fitlog-users'
+MONGO_HOST = os.environ.get('MONGO_HOST', 'localhost')
+MONGO_PORT = int(os.environ.get('MONGO_PORT', '27017'))
+MONGO_DB = os.environ.get('MONGO_DB', 'fitlog')
 
 
-def get_dynamodb():
-    kwargs = {'region_name': os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')}
-    endpoint = os.environ.get('DYNAMODB_ENDPOINT_URL')
-    if endpoint:
-        kwargs['endpoint_url'] = endpoint
-    return boto3.resource('dynamodb', **kwargs)
+def get_db():
+    client = MongoClient(MONGO_HOST, MONGO_PORT)
+    return client[MONGO_DB]
 
 
-def get_table():
-    return get_dynamodb().Table(TABLE_NAME)
+def get_users():
+    return get_db()['users']
 
 
 def validate_name(name):
-    """Validate name input - allow only letters, spaces, hyphens, apostrophes"""
     if not name or len(name) > 50:
         return False
     return bool(re.match(r"^[a-zA-Z\s\-']+$", name))
 
 
 def validate_email(email):
-    """Basic email validation"""
     if not email or len(email) > 254:
         return False
-    # Simple regex for email validation
     return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
 
 
 def init_db():
-    dynamodb = get_dynamodb()
-    try:
-        dynamodb.create_table(
-            TableName=TABLE_NAME,
-            KeySchema=[
-                {'AttributeName': 'email', 'KeyType': 'HASH'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'email', 'AttributeType': 'S'}
-            ],
-            BillingMode='PAY_PER_REQUEST'
-        )
-        dynamodb.Table(TABLE_NAME).wait_until_exists()
-    except ClientError as e:
-        if e.response['Error']['Code'] != 'ResourceInUseException':
-            raise
+    users = get_users()
+    users.create_index('email', unique=True)
 
 
 @app.route('/')
@@ -78,32 +59,26 @@ def register():
 
     if not first_name or not last_name or not email or not password:
         return jsonify({'error': 'All fields are required.'}), 400
-    
+
     if not validate_name(first_name) or not validate_name(last_name):
         return jsonify({'error': 'Names can only contain letters, spaces, hyphens, and apostrophes.'}), 400
-    
+
     if not validate_email(email):
         return jsonify({'error': 'Please enter a valid email address.'}), 400
-    
+
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters.'}), 400
 
-    table = get_table()
     try:
-        table.put_item(
-            Item={
-                'user_id': str(uuid.uuid4()),
-                'email': email,
-                'first_name': first_name,
-                'last_name': last_name,
-                'password_hash': generate_password_hash(password)
-            },
-            ConditionExpression='attribute_not_exists(email)'
-        )
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
-            return jsonify({'error': 'An account with that email already exists.'}), 409
-        raise
+        get_users().insert_one({
+            'user_id': str(uuid.uuid4()),
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'password_hash': generate_password_hash(password)
+        })
+    except DuplicateKeyError:
+        return jsonify({'error': 'An account with that email already exists.'}), 409
 
     session['email'] = email
     session['first_name'] = first_name
@@ -124,13 +99,11 @@ def login():
 
     if not email or not password:
         return jsonify({'error': 'Please enter your email and password.'}), 400
-    
+
     if not validate_email(email):
         return jsonify({'error': 'Please enter a valid email address.'}), 400
 
-    table = get_table()
-    response = table.get_item(Key={'email': email})
-    user = response.get('Item')
+    user = get_users().find_one({'email': email})
 
     if user is None or not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'Invalid email or password.'}), 401
@@ -173,4 +146,4 @@ def add_security_headers(response):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
