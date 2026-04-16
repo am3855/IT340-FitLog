@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FitLog</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=DM+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div id="view-login">
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="logo">FIT<span>LOG</span></div>
+      <div class="tagline">Track your lifts. Own your progress.</div>
+      <div class="auth-title">Welcome Back</div>
+      <div class="error-box" id="login-error"></div>
+      <form onsubmit="return false;">
+        <div class="field-group">
+          <label class="field-label" for="login-email">Email Address</label>
+          <input class="field-input" id="login-email" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="login-password">Password</label>
+          <input class="field-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div class="forgot-link"><a href="#">Forgot password?</a></div>
+        <button class="btn-main" type="submit" onclick="handleLogin()">Sign In</button>
+      </form>
+      <div class="switch-link">
+        Don't have an account? <a onclick="showView('register')">Create one &rarr;</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-register" class="hidden">
+  <div class="auth-wrapper">
+    <div class="auth-card wide">
+      <div class="logo">FIT<span>LOG</span></div>
+      <div class="tagline">Start tracking. Stay consistent.</div>
+      <div class="auth-title">Create Account</div>
+      <div class="error-box" id="register-error"></div>
+      <form onsubmit="return false;">
+        <div class="name-row">
+          <div class="field-group">
+            <label class="field-label" for="reg-first">First Name</label>
+            <input class="field-input" id="reg-first" type="text" placeholder="First" autocomplete="given-name">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="reg-last">Last Name</label>
+            <input class="field-input" id="reg-last" type="text" placeholder="Last" autocomplete="family-name">
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="reg-email">Email Address</label>
+          <input class="field-input" id="reg-email" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="reg-password">Create Password</label>
+          <input class="field-input" id="reg-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password" oninput="checkStrength(this.value)">
+          <div class="strength-meter">
+            <div class="strength-seg" id="seg1"></div>
+            <div class="strength-seg" id="seg2"></div>
+            <div class="strength-seg" id="seg3"></div>
+            <div class="strength-seg" id="seg4"></div>
+          </div>
+          <div class="strength-label" id="strength-label">Enter a password</div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="reg-confirm">Confirm Password</label>
+          <input class="field-input" id="reg-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
+        </div>
+        <label class="terms-row">
+          <input type="checkbox" id="reg-terms">
+          <span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span>
+        </label>
+        <button class="btn-main" type="submit" onclick="handleRegister()">Create My Account</button>
+      </form>
+      <div class="switch-link">
+        Already have an account? <a onclick="showView('login')">Sign in &rarr;</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-dashboard" class="hidden">
+  <nav>
+    <div class="nav-logo">FIT<span>LOG</span></div>
+    <ul>
+      <li><a href="#" class="active">Dashboard</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">Progress</a></li>
+      <li><a href="#">Admin</a></li>
+    </ul>
+    <div class="nav-right">
+      <span class="nav-user" id="nav-username"></span>
+      <button class="btn-ghost" onclick="handleLogout()">Log Out</button>
+      <button class="btn-primary">+ Log Workout</button>
+    </div>
+  </nav>
+
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-num">48</div>
+      <div class="stat-label">Total Workouts</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">12,450</div>
+      <div class="stat-label">Total Volume (lbs)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">6</div>
+      <div class="stat-label">Week Streak</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">3</div>
+      <div class="stat-label">This Week</div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="sidebar">
+      <a class="sidebar-item active" href="#">Dashboard</a>
+      <a class="sidebar-item" href="#">Log Workout</a>
+      <div class="sidebar-label">Tracking</div>
+      <a class="sidebar-item" href="#">History</a>
+      <a class="sidebar-item" href="#">Progress</a>
+      <a class="sidebar-item" href="#">Personal Records</a>
+      <div class="sidebar-label">Account</div>
+      <a class="sidebar-item" href="#">Profile</a>
+      <a class="sidebar-item" href="#">Settings</a>
+      <a class="sidebar-item" href="#">Admin Panel</a>
+    </div>
+
+    <div class="content">
+      <div class="section-header">
+        <div class="section-title">Recent Workouts</div>
+        <button class="btn-ghost">View All</button>
+      </div>
+
+      <table class="workout-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Exercise</th>
+            <th>Sets &times; Reps</th>
+            <th>Weight</th>
+            <th>Volume</th>
+            <th>Progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Apr 10</td>
+            <td><strong>Bench Press</strong></td>
+            <td>4 &times; 8</td>
+            <td>185 lbs</td>
+            <td>5,920 lbs</td>
+            <td><span class="badge badge-green">&#8593; PR</span></td>
+          </tr>
+          <tr>
+            <td>Apr 10</td>
+            <td><strong>Squat</strong></td>
+            <td>5 &times; 5</td>
+            <td>225 lbs</td>
+            <td>5,625 lbs</td>
+            <td><span class="badge badge-blue">Same</span></td>
+          </tr>
+          <tr>
+            <td>Apr 8</td>
+            <td><strong>Deadlift</strong></td>
+            <td>3 &times; 5</td>
+            <td>315 lbs</td>
+            <td>4,725 lbs</td>
+            <td><span class="badge badge-green">&#8593; +10</span></td>
+          </tr>
+          <tr>
+            <td>Apr 7</td>
+            <td><strong>Overhead Press</strong></td>
+            <td>4 &times; 6</td>
+            <td>115 lbs</td>
+            <td>2,760 lbs</td>
+            <td><span class="badge badge-red">&#8595; &minus;5</span></td>
+          </tr>
+          <tr>
+            <td>Apr 5</td>
+            <td><strong>Pull-Up</strong></td>
+            <td>3 &times; 10</td>
+            <td>BW+25</td>
+            <td>&mdash;</td>
+            <td><span class="badge badge-green">&#8593; +2 reps</span></td>
+          </tr>
+          <tr>
+            <td>Apr 3</td>
+            <td><strong>Romanian Deadlift</strong></td>
+            <td>3 &times; 8</td>
+            <td>185 lbs</td>
+            <td>4,440 lbs</td>
+            <td><span class="badge badge-blue">Same</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="chart-section">
+        <div class="section-title" style="font-size:18px;">Volume This Week</div>
+        <div class="chart-bars">
+          <div class="chart-col">
+            <div class="chart-bar empty" style="height:24px;"></div>
+            <span class="chart-day">Mon</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar" style="height:55px;"></div>
+            <span class="chart-day">Tue</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar empty" style="height:16px;"></div>
+            <span class="chart-day">Wed</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar" style="height:72px;"></div>
+            <span class="chart-day">Thu</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar" style="height:44px;"></div>
+            <span class="chart-day">Fri</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar empty" style="height:10px;"></div>
+            <span class="chart-day">Sat</span>
+          </div>
+          <div class="chart-col">
+            <div class="chart-bar" style="height:62px;"></div>
+            <span class="chart-day">Sun</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div>
+        <div class="panel-title">Weekly Goals</div>
+        <div class="circles-row">
+          <div class="circle-wrap">
+            <div class="circle" style="background: conic-gradient(var(--green) 0% 72%, var(--border) 72% 100%)">
+              <span class="circle-text">72%</span>
+            </div>
+            <span class="circle-label">Workouts</span>
+          </div>
+          <div class="circle-wrap">
+            <div class="circle" style="background: conic-gradient(var(--blue) 0% 50%, var(--border) 50% 100%)">
+              <span class="circle-text" style="color:var(--blue)">50%</span>
+            </div>
+            <span class="circle-label">Volume</span>
+          </div>
+          <div class="circle-wrap">
+            <div class="circle" style="background: conic-gradient(var(--green) 0% 88%, var(--border) 88% 100%)">
+              <span class="circle-text">88%</span>
+            </div>
+            <span class="circle-label">Streak</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Top Lifts vs PR</div>
+        <div class="prog-row">
+          <div class="prog-meta"><strong>Bench Press</strong><span>185 / 210 lbs</span></div>
+          <div class="prog-bar"><div class="prog-fill" style="width:88%"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-meta"><strong>Squat</strong><span>225 / 275 lbs</span></div>
+          <div class="prog-bar"><div class="prog-fill" style="width:82%"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-meta"><strong>Deadlift</strong><span>315 / 365 lbs</span></div>
+          <div class="prog-bar"><div class="prog-fill" style="width:86%;background:var(--blue)"></div></div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-meta"><strong>OHP</strong><span>115 / 145 lbs</span></div>
+          <div class="prog-bar"><div class="prog-fill" style="width:79%"></div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Last Workout</div>
+        <div class="recent-card">
+          <div class="recent-title">Push Day A</div>
+          <div class="recent-meta">Apr 10, 2026 &middot; 58 min</div>
+          <div class="mini-stats">
+            <div class="mini-stat">
+              <span class="val">4</span>
+              <span class="lbl">Exercises</span>
+            </div>
+            <div class="mini-stat">
+              <span class="val">17</span>
+              <span class="lbl">Sets</span>
+            </div>
+            <div class="mini-stat">
+              <span class="val">8,680</span>
+              <span class="lbl">Volume lbs</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
