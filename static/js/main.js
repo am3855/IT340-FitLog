@@ -45,8 +45,10 @@ function checkStrength(val) {
   label.textContent = 'Password strength: ' + (labels[score] || 'Weak');
 }
 
+var API_BASE = window.API_BASE || '';
+
 async function checkAuth() {
-  var res = await fetch('/api/me');
+  var res = await fetch(API_BASE + '/api/me', { credentials: 'include' });
   var data = await res.json();
   if (data.logged_in) {
     setUser(data.user);
@@ -61,9 +63,10 @@ async function handleLogin() {
   var email = document.getElementById('login-email').value.trim();
   var password = document.getElementById('login-password').value;
 
-  var res = await fetch('/api/login', {
+  var res = await fetch(API_BASE + '/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ email: email, password: password })
   });
   var data = await res.json();
@@ -107,9 +110,10 @@ async function handleRegister() {
     return;
   }
 
-  var res = await fetch('/api/register', {
+  var res = await fetch(API_BASE + '/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ first_name: firstName, last_name: lastName, email: email, password: password })
   });
   var data = await res.json();
@@ -124,7 +128,7 @@ async function handleRegister() {
 }
 
 async function handleLogout() {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch(API_BASE + '/api/logout', { method: 'POST', credentials: 'include' });
   showView('login');
 }
 

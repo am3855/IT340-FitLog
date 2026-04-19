@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, session, render_template
+from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
@@ -8,6 +9,9 @@ import re
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fitlog-dev-secret-key')
+
+FRONTEND_ORIGIN = os.environ.get('FRONTEND_ORIGIN', '')
+CORS(app, origins=FRONTEND_ORIGIN or '*', supports_credentials=True)
 
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
