@@ -17,10 +17,11 @@ MONGO_HOST = os.environ.get('MONGO_HOST', 'localhost')
 MONGO_PORT = int(os.environ.get('MONGO_PORT', '27017'))
 MONGO_DB = os.environ.get('MONGO_DB', 'fitlog')
 
+_client = MongoClient(MONGO_HOST, MONGO_PORT)
+
 
 def get_db():
-    client = MongoClient(MONGO_HOST, MONGO_PORT)
-    return client[MONGO_DB]
+    return _client[MONGO_DB]
 
 
 def get_users():
@@ -51,7 +52,7 @@ def index():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    data = request.get_json() or {}
     first_name = data.get('first_name', '').strip()
     last_name = data.get('last_name', '').strip()
     email = data.get('email', '').strip().lower()
@@ -93,7 +94,7 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
 
@@ -146,4 +147,4 @@ def add_security_headers(response):
 
 if __name__ == '__main__':
     init_db()
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
