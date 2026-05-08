@@ -549,3 +549,200 @@ nav ul li a.active { color: var(--text); }
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* =========================================================
+   WORKOUT FORM
+   ========================================================= */
+
+.workout-form-card {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 28px;
+}
+
+.workout-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .workout-form-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* =========================================================
+   EMPTY TABLE ROW
+   ========================================================= */
+
+.empty-row {
+  text-align: center;
+  color: var(--muted);
+  padding: 28px !important;
+  font-size: 13px;
+}
+
+/* =========================================================
+   CHART CONTAINERS
+   ========================================================= */
+
+.chart-container {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-height: 260px;
+}
+
+.chart-container canvas {
+  max-height: 220px;
+}
+
+/* =========================================================
+   ADMIN PANEL
+   ========================================================= */
+
+.admin-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin: 24px 0 10px;
+  font-weight: 600;
+}
+
+.admin-btn {
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+}
+
+.admin-btn.danger {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+
+.admin-btn.danger:hover { background: rgba(255,82,82,0.08); }
+
+/* =========================================================
+   EDIT MODAL
+   ========================================================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+
+.modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* =========================================================
+   EXERCISE SEARCH DROPDOWN
+   ========================================================= */
+
+.exercise-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  z-index: 50;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.exercise-dropdown-item {
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.exercise-dropdown-item:last-child { border-bottom: none; }
+.exercise-dropdown-item:hover { background: rgba(184,249,79,0.08); color: var(--green); }
+
+/* =========================================================
+   BROWSE EXERCISES (WGER)
+   ========================================================= */
+
+.exercise-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.exercise-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.exercise-card:hover {
+  border-color: var(--green);
+  background: rgba(184,249,79,0.06);
+}
+
+.exercise-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.exercise-card-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   EMAIL 2FA VIEW
+   ========================================================= */
+
+#view-email2fa .auth-card { max-width: 420px; }
+
+/* =========================================================
+   PANEL VISIBILITY
+   ========================================================= */
+
+#panel-workouts, #panel-admin { min-height: 200px; }
+
