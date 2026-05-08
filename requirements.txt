@@ -1,2 +1,5 @@
 flask
 pymongo
+werkzeug
+python-dotenv
+requests
