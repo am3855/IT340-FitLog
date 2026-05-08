@@ -1,21 +1,43 @@
 from flask import Flask, request, jsonify, session, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from bson import ObjectId
+from dotenv import load_dotenv
 import uuid
 import os
 import re
+import random
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
+
+load_dotenv()
+
+try:
+    import requests as http_requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fitlog-dev-secret-key')
 
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 
 MONGO_HOST = os.environ.get('MONGO_HOST', 'localhost')
 MONGO_PORT = int(os.environ.get('MONGO_PORT', '27017'))
-MONGO_DB = os.environ.get('MONGO_DB', 'fitlog')
+MONGO_DB   = os.environ.get('MONGO_DB', 'fitlog')
+
+WGER_BASE = 'https://wger.de/api/v2'
+
+# To use Gmail SMTP: go to myaccount.google.com -> Security ->
+# 2-Step Verification -> App Passwords -> generate one for "Mail"
+# and put it in MAIL_PASSWORD in your .env file
+MAIL_EMAIL    = os.environ.get('MAIL_EMAIL', '')
+MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
 
 
 def get_db():
@@ -25,6 +47,24 @@ def get_db():
 
 def get_users():
     return get_db()['users']
+
+
+def get_workouts():
+    return get_db()['workouts']
+
+
+def require_login():
+    if 'email' not in session:
+        return jsonify({'error': 'Authentication required.'}), 401
+    return None
+
+
+def require_admin():
+    if 'email' not in session:
+        return jsonify({'error': 'Authentication required.'}), 401
+    if not session.get('is_admin', False):
+        return jsonify({'error': 'Admin access required.'}), 403
+    return None
 
 
 def validate_name(name):
@@ -39,10 +79,81 @@ def validate_email(email):
     return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
 
 
+def serialize_workout(w):
+    return {
+        'id': str(w['_id']),
+        'exercise': w.get('exercise', ''),
+        'sets': w.get('sets', 0),
+        'reps': w.get('reps', 0),
+        'weight': w.get('weight', 0),
+        'duration': w.get('duration', 0),
+        'date': w.get('date', ''),
+        'user_email': w.get('user_email', ''),
+    }
+
+
+def _strip_html(text):
+    if not text:
+        return ''
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    for entity, char in [('&nbsp;', ' '), ('&amp;', '&'), ('&lt;', '<'),
+                          ('&gt;', '>'), ('&quot;', '"'), ('&#39;', "'")]:
+        clean = clean.replace(entity, char)
+    return ' '.join(clean.split())
+
+
+def send_2fa_email(to_email, code):
+    if not MAIL_EMAIL or not MAIL_PASSWORD:
+        raise RuntimeError('Email credentials not configured (MAIL_EMAIL / MAIL_PASSWORD missing in .env).')
+    body = (
+        f'Your FitLog login verification code is: {code}\n\n'
+        'This code expires in 10 minutes.\n'
+        'If you did not request this, please ignore this email.'
+    )
+    msg = MIMEText(body)
+    msg['Subject'] = 'Your FitLog verification code'
+    msg['From']    = MAIL_EMAIL
+    msg['To']      = to_email
+    with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+        smtp.ehlo()
+        smtp.starttls()
+        smtp.login(MAIL_EMAIL, MAIL_PASSWORD)
+        smtp.sendmail(MAIL_EMAIL, to_email, msg.as_string())
+
+
+def _create_session(user):
+    session['email']       = user['email']
+    session['first_name']  = user['first_name']
+    session['last_name']   = user['last_name']
+    session['is_admin']    = user.get('is_admin', False)
+    session['2fa_enabled'] = user.get('2fa_enabled', False)
+
+
 def init_db():
     users = get_users()
     users.create_index('email', unique=True)
+    # Remove stale fields from old integrations
+    users.update_many({}, {'$unset': {
+        'fitbit_access_token': '',
+        'fitbit_refresh_token': '',
+        'duo_2fa_enabled': '',
+        'duo_username': '',
+    }})
+    if not users.find_one({'email': 'admin@fitlog.com'}):
+        users.insert_one({
+            'user_id': str(uuid.uuid4()),
+            'email': 'admin@fitlog.com',
+            'first_name': 'Admin',
+            'last_name': 'FitLog',
+            'password_hash': generate_password_hash('Admin123!'),
+            'is_admin': True,
+            '2fa_enabled': False,
+        })
 
+
+# ---------------------------------------------------------------------------
+# Core routes
+# ---------------------------------------------------------------------------
 
 @app.route('/')
 def index():
@@ -51,21 +162,18 @@ def index():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    data       = request.get_json()
     first_name = data.get('first_name', '').strip()
-    last_name = data.get('last_name', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
+    last_name  = data.get('last_name', '').strip()
+    email      = data.get('email', '').strip().lower()
+    password   = data.get('password', '')
 
     if not first_name or not last_name or not email or not password:
         return jsonify({'error': 'All fields are required.'}), 400
-
     if not validate_name(first_name) or not validate_name(last_name):
         return jsonify({'error': 'Names can only contain letters, spaces, hyphens, and apostrophes.'}), 400
-
     if not validate_email(email):
         return jsonify({'error': 'Please enter a valid email address.'}), 400
-
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters.'}), 400
 
@@ -75,47 +183,59 @@ def register():
             'email': email,
             'first_name': first_name,
             'last_name': last_name,
-            'password_hash': generate_password_hash(password)
+            'password_hash': generate_password_hash(password),
+            'is_admin': False,
+            '2fa_enabled': False,
         })
     except DuplicateKeyError:
         return jsonify({'error': 'An account with that email already exists.'}), 409
 
-    session['email'] = email
-    session['first_name'] = first_name
-    session['last_name'] = last_name
-
+    user = get_users().find_one({'email': email})
+    _create_session(user)
     return jsonify({'success': True, 'user': {
         'first_name': first_name,
         'last_name': last_name,
-        'email': email
+        'email': email,
+        'is_admin': False,
     }})
 
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    email = data.get('email', '').strip().lower()
+    data     = request.get_json()
+    email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
 
     if not email or not password:
         return jsonify({'error': 'Please enter your email and password.'}), 400
-
     if not validate_email(email):
         return jsonify({'error': 'Please enter a valid email address.'}), 400
 
     user = get_users().find_one({'email': email})
-
     if user is None or not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'Invalid email or password.'}), 401
 
-    session['email'] = user['email']
-    session['first_name'] = user['first_name']
-    session['last_name'] = user['last_name']
+    if user.get('2fa_enabled', False):
+        code    = str(random.randint(100000, 999999))
+        expires = datetime.utcnow() + timedelta(minutes=10)
+        get_users().update_one(
+            {'email': email},
+            {'$set': {'2fa_code': code, '2fa_expires': expires}},
+        )
+        try:
+            send_2fa_email(email, code)
+        except Exception as exc:
+            return jsonify({'error': f'Failed to send verification email: {exc}'}), 502
 
-    return jsonify({'success': True, 'user': {
+        session['pending_2fa_email'] = email
+        return jsonify({'success': True, 'requires_2fa': True})
+
+    _create_session(user)
+    return jsonify({'success': True, 'requires_2fa': False, 'user': {
         'first_name': user['first_name'],
         'last_name': user['last_name'],
-        'email': user['email']
+        'email': user['email'],
+        'is_admin': user.get('is_admin', False),
     }})
 
 
@@ -125,7 +245,9 @@ def me():
         return jsonify({'logged_in': True, 'user': {
             'first_name': session['first_name'],
             'last_name': session['last_name'],
-            'email': session['email']
+            'email': session['email'],
+            'is_admin': session.get('is_admin', False),
+            '2fa_enabled': session.get('2fa_enabled', False),
         }})
     return jsonify({'logged_in': False})
 
@@ -135,6 +257,384 @@ def logout():
     session.clear()
     return jsonify({'success': True})
 
+
+# ---------------------------------------------------------------------------
+# Workout routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/workouts', methods=['POST'])
+def create_workout():
+    err = require_login()
+    if err:
+        return err
+
+    data     = request.get_json()
+    exercise = data.get('exercise', '').strip()
+    sets     = data.get('sets')
+    reps     = data.get('reps')
+    weight   = data.get('weight', 0)
+    duration = data.get('duration', 0)
+    date     = data.get('date', '').strip()
+
+    if not exercise or sets is None or reps is None or not date:
+        return jsonify({'error': 'Exercise, sets, reps, and date are required.'}), 400
+
+    try:
+        sets     = int(sets)
+        reps     = int(reps)
+        weight   = float(weight)
+        duration = int(duration)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Sets, reps, weight, and duration must be numbers.'}), 400
+
+    if sets <= 0 or reps <= 0:
+        return jsonify({'error': 'Sets and reps must be positive.'}), 400
+
+    result  = get_workouts().insert_one({
+        'user_email': session['email'],
+        'exercise': exercise,
+        'sets': sets,
+        'reps': reps,
+        'weight': weight,
+        'duration': duration,
+        'date': date,
+    })
+    workout = get_workouts().find_one({'_id': result.inserted_id})
+    return jsonify({'success': True, 'workout': serialize_workout(workout)}), 201
+
+
+@app.route('/api/workouts', methods=['GET'])
+def get_user_workouts():
+    err = require_login()
+    if err:
+        return err
+    workouts = list(get_workouts().find({'user_email': session['email']}).sort('date', -1))
+    return jsonify({'workouts': [serialize_workout(w) for w in workouts]})
+
+
+# ---------------------------------------------------------------------------
+# Admin routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/admin/users', methods=['GET'])
+def admin_get_users():
+    err = require_admin()
+    if err:
+        return err
+
+    users  = list(get_users().find({}, {'password_hash': 0}))
+    result = []
+    for u in users:
+        user_workouts = list(get_workouts().find({'user_email': u['email']}))
+        result.append({
+            'user_id': u.get('user_id', ''),
+            'email': u.get('email', ''),
+            'first_name': u.get('first_name', ''),
+            'last_name': u.get('last_name', ''),
+            'is_admin': u.get('is_admin', False),
+            '2fa_enabled': u.get('2fa_enabled', False),
+            'workouts': [serialize_workout(w) for w in user_workouts],
+        })
+    return jsonify({'users': result})
+
+
+@app.route('/api/admin/workouts/<workout_id>', methods=['PUT'])
+def admin_update_workout(workout_id):
+    err = require_admin()
+    if err:
+        return err
+
+    try:
+        oid = ObjectId(workout_id)
+    except Exception:
+        return jsonify({'error': 'Invalid workout ID.'}), 400
+
+    data    = request.get_json()
+    updates = {}
+    if 'exercise' in data:
+        updates['exercise'] = str(data['exercise']).strip()
+    if 'sets' in data:
+        try:
+            updates['sets'] = int(data['sets'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Sets must be a number.'}), 400
+    if 'reps' in data:
+        try:
+            updates['reps'] = int(data['reps'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Reps must be a number.'}), 400
+    if 'weight' in data:
+        try:
+            updates['weight'] = float(data['weight'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Weight must be a number.'}), 400
+    if 'duration' in data:
+        try:
+            updates['duration'] = int(data['duration'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Duration must be a number.'}), 400
+    if 'date' in data:
+        updates['date'] = str(data['date']).strip()
+
+    workout = get_workouts().find_one_and_update(
+        {'_id': oid},
+        {'$set': updates},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not workout:
+        return jsonify({'error': 'Workout not found.'}), 404
+    return jsonify({'success': True, 'workout': serialize_workout(workout)})
+
+
+@app.route('/api/admin/workouts/<workout_id>', methods=['DELETE'])
+def admin_delete_workout(workout_id):
+    err = require_admin()
+    if err:
+        return err
+
+    try:
+        oid = ObjectId(workout_id)
+    except Exception:
+        return jsonify({'error': 'Invalid workout ID.'}), 400
+
+    result = get_workouts().delete_one({'_id': oid})
+    if result.deleted_count == 0:
+        return jsonify({'error': 'Workout not found.'}), 404
+    return jsonify({'success': True})
+
+
+# ---------------------------------------------------------------------------
+# Wger API proxy routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/exercises', methods=['GET'])
+def get_exercises():
+    err = require_login()
+    if err:
+        return err
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'error': 'requests library not available.'}), 503
+    try:
+        resp = http_requests.get(
+            f'{WGER_BASE}/exercise/',
+            params={'format': 'json', 'language': 2, 'limit': 20},
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch exercises from Wger.'}), 502
+        exercises = [
+            {
+                'id': ex.get('id') or ex.get('base'),
+                'name': ex.get('name', '').strip(),
+                'description': _strip_html(ex.get('description', '')),
+            }
+            for ex in resp.json().get('results', [])
+            if ex.get('name', '').strip()
+        ]
+        return jsonify({'exercises': exercises})
+    except Exception as exc:
+        return jsonify({'error': f'Wger request failed: {exc}'}), 502
+
+
+@app.route('/api/exercises/search', methods=['GET'])
+def search_exercises():
+    err = require_login()
+    if err:
+        return err
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'error': 'requests library not available.'}), 503
+    term = request.args.get('term', '').strip()
+    if not term:
+        return jsonify({'exercises': []})
+    try:
+        resp = http_requests.get(
+            f'{WGER_BASE}/exercise/search/',
+            params={'term': term, 'language': 'english', 'format': 'json'},
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return jsonify({'exercises': []})
+        exercises = [
+            {
+                'id': s.get('data', {}).get('base_id'),
+                'name': s.get('value', '').strip(),
+            }
+            for s in resp.json().get('suggestions', [])
+            if s.get('value', '').strip()
+        ]
+        return jsonify({'exercises': exercises})
+    except Exception:
+        return jsonify({'exercises': []})
+
+
+@app.route('/api/muscles', methods=['GET'])
+def get_muscles():
+    err = require_login()
+    if err:
+        return err
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'error': 'requests library not available.'}), 503
+    try:
+        resp = http_requests.get(
+            f'{WGER_BASE}/muscle/',
+            params={'format': 'json'},
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch muscles from Wger.'}), 502
+        muscles = [
+            {
+                'id': m.get('id'),
+                'name': m.get('name_en') or m.get('name', ''),
+            }
+            for m in resp.json().get('results', [])
+            if m.get('name_en') or m.get('name')
+        ]
+        return jsonify({'muscles': muscles})
+    except Exception as exc:
+        return jsonify({'error': f'Wger request failed: {exc}'}), 502
+
+
+@app.route('/api/exercises/by-muscle', methods=['GET'])
+def get_exercises_by_muscle():
+    err = require_login()
+    if err:
+        return err
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'error': 'requests library not available.'}), 503
+    muscle_id = request.args.get('muscle_id', '').strip()
+    if not muscle_id:
+        return jsonify({'error': 'muscle_id is required.'}), 400
+    try:
+        muscle_id = int(muscle_id)
+    except ValueError:
+        return jsonify({'error': 'muscle_id must be a number.'}), 400
+    try:
+        resp = http_requests.get(
+            f'{WGER_BASE}/exercise/',
+            params={'format': 'json', 'language': 2, 'muscles': muscle_id, 'limit': 20},
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch exercises from Wger.'}), 502
+        exercises = [
+            {
+                'id': ex.get('id') or ex.get('base'),
+                'name': ex.get('name', '').strip(),
+                'description': _strip_html(ex.get('description', '')),
+            }
+            for ex in resp.json().get('results', [])
+            if ex.get('name', '').strip()
+        ]
+        return jsonify({'exercises': exercises})
+    except Exception as exc:
+        return jsonify({'error': f'Wger request failed: {exc}'}), 502
+
+
+# ---------------------------------------------------------------------------
+# Email 2FA routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/2fa/status', methods=['GET'])
+def get_2fa_status():
+    err = require_login()
+    if err:
+        return err
+    return jsonify({'2fa_enabled': session.get('2fa_enabled', False)})
+
+
+@app.route('/api/2fa/verify', methods=['POST'])
+def verify_2fa():
+    data  = request.get_json()
+    email = data.get('email', '').strip().lower()
+    code  = str(data.get('code', '')).strip()
+
+    if not email or not code:
+        return jsonify({'error': 'Email and code are required.'}), 400
+
+    user = get_users().find_one({'email': email})
+    if not user:
+        return jsonify({'error': 'Invalid or expired code.'}), 401
+
+    stored_code    = user.get('2fa_code', '')
+    stored_expires = user.get('2fa_expires')
+
+    if not stored_code or not stored_expires:
+        return jsonify({'error': 'No verification code found. Please log in again.'}), 401
+
+    if datetime.utcnow() > stored_expires:
+        get_users().update_one({'email': email}, {'$unset': {'2fa_code': '', '2fa_expires': ''}})
+        return jsonify({'error': 'Code expired, please log in again.'}), 401
+
+    if code != stored_code:
+        return jsonify({'error': 'Invalid or expired code.'}), 401
+
+    get_users().update_one({'email': email}, {'$unset': {'2fa_code': '', '2fa_expires': ''}})
+    session.pop('pending_2fa_email', None)
+    _create_session(user)
+    return jsonify({'success': True, 'user': {
+        'first_name': user['first_name'],
+        'last_name': user['last_name'],
+        'email': user['email'],
+        'is_admin': user.get('is_admin', False),
+    }})
+
+
+@app.route('/api/2fa/resend', methods=['POST'])
+def resend_2fa():
+    pending_email = session.get('pending_2fa_email')
+    if not pending_email:
+        return jsonify({'error': 'No pending 2FA session. Please log in again.'}), 400
+
+    user = get_users().find_one({'email': pending_email})
+    if not user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    code    = str(random.randint(100000, 999999))
+    expires = datetime.utcnow() + timedelta(minutes=10)
+    get_users().update_one(
+        {'email': pending_email},
+        {'$set': {'2fa_code': code, '2fa_expires': expires}},
+    )
+    try:
+        send_2fa_email(pending_email, code)
+    except Exception as exc:
+        return jsonify({'error': f'Failed to send verification email: {exc}'}), 502
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/2fa/enroll', methods=['POST'])
+def enroll_2fa():
+    err = require_login()
+    if err:
+        return err
+    data   = request.get_json()
+    enable = bool(data.get('enable', True))
+    get_users().update_one(
+        {'email': session['email']},
+        {'$set': {'2fa_enabled': enable}},
+    )
+    session['2fa_enabled'] = enable
+    return jsonify({'success': True, '2fa_enabled': enable})
+
+
+@app.route('/api/2fa/disable', methods=['POST'])
+def disable_2fa():
+    err = require_login()
+    if err:
+        return err
+    get_users().update_one(
+        {'email': session['email']},
+        {'$set': {'2fa_enabled': False}, '$unset': {'2fa_code': '', '2fa_expires': ''}},
+    )
+    session['2fa_enabled'] = False
+    return jsonify({'success': True, '2fa_enabled': False})
+
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
 
 @app.after_request
 def add_security_headers(response):
