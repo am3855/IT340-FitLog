@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FitLog</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=DM+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
+<!-- ===================== LOGIN VIEW ===================== -->
 <div id="view-login">
   <div class="auth-wrapper">
     <div class="auth-card">
@@ -35,6 +36,7 @@
   </div>
 </div>
 
+<!-- ===================== REGISTER VIEW ===================== -->
 <div id="view-register" class="hidden">
   <div class="auth-wrapper">
     <div class="auth-card wide">
@@ -85,161 +87,225 @@
   </div>
 </div>
 
+<!-- ===================== EMAIL 2FA VIEW ===================== -->
+<div id="view-email2fa" class="hidden">
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="logo">FIT<span>LOG</span></div>
+      <div class="tagline">Verify your identity to continue.</div>
+      <div class="auth-title">Check Your Email</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:24px;">
+        A 6-digit code was sent to your email address. It expires in 10 minutes.
+      </p>
+      <div class="error-box" id="email2fa-error"></div>
+      <div class="field-group">
+        <label class="field-label" for="email2fa-code">Verification Code</label>
+        <input class="field-input" id="email2fa-code" type="text" inputmode="numeric"
+          maxlength="6" placeholder="000000" autocomplete="one-time-code"
+          style="text-align:center;font-size:22px;letter-spacing:6px;">
+      </div>
+      <button class="btn-main" onclick="handleVerify2FA()">Verify</button>
+      <div style="text-align:center;font-size:13px;color:var(--muted);margin-top:-12px;margin-bottom:16px;">
+        Didn&rsquo;t receive it?
+        <a id="resend-link" onclick="resendCode()" style="color:var(--green);cursor:pointer;font-weight:600;">Resend code</a>
+      </div>
+      <button class="btn-ghost" style="width:100%;" onclick="showView('login')">Cancel &amp; Go Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DASHBOARD VIEW ===================== -->
 <div id="view-dashboard" class="hidden">
   <nav>
     <div class="nav-logo">FIT<span>LOG</span></div>
     <ul>
-      <li><a href="#" class="active">Dashboard</a></li>
-      <li><a href="#">History</a></li>
-      <li><a href="#">Progress</a></li>
-      <li><a href="#">Admin</a></li>
+      <li><a href="#" class="active" onclick="showPanel('workouts');return false;">Dashboard</a></li>
+      <li><a href="#" onclick="showPanel('workouts');return false;">History</a></li>
+      <li><a href="#" class="admin-only hidden" onclick="showPanel('admin');return false;">Admin</a></li>
     </ul>
     <div class="nav-right">
       <span class="nav-user" id="nav-username"></span>
       <button class="btn-ghost" onclick="handleLogout()">Log Out</button>
-      <button class="btn-primary">+ Log Workout</button>
+      <button class="btn-primary" onclick="toggleWorkoutForm()">+ Log Workout</button>
     </div>
   </nav>
 
   <div class="stats-bar">
     <div class="stat-item">
-      <div class="stat-num">48</div>
+      <div class="stat-num" id="stat-total-workouts">0</div>
       <div class="stat-label">Total Workouts</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">12,450</div>
+      <div class="stat-num" id="stat-total-volume">0</div>
       <div class="stat-label">Total Volume (lbs)</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">6</div>
-      <div class="stat-label">Week Streak</div>
+      <div class="stat-num" id="stat-this-week">0</div>
+      <div class="stat-label">This Week</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">3</div>
-      <div class="stat-label">This Week</div>
+      <div class="stat-num" id="stat-best-streak">0</div>
+      <div class="stat-label">Day Streak</div>
     </div>
   </div>
 
   <div class="main">
 
+    <!-- Sidebar -->
     <div class="sidebar">
-      <a class="sidebar-item active" href="#">Dashboard</a>
-      <a class="sidebar-item" href="#">Log Workout</a>
+      <a class="sidebar-item active" href="#" onclick="showPanel('workouts');return false;">Dashboard</a>
+      <a class="sidebar-item" href="#" onclick="toggleWorkoutForm();return false;">Log Workout</a>
       <div class="sidebar-label">Tracking</div>
-      <a class="sidebar-item" href="#">History</a>
-      <a class="sidebar-item" href="#">Progress</a>
-      <a class="sidebar-item" href="#">Personal Records</a>
+      <a class="sidebar-item" href="#" onclick="showPanel('workouts');return false;">History</a>
       <div class="sidebar-label">Account</div>
       <a class="sidebar-item" href="#">Profile</a>
       <a class="sidebar-item" href="#">Settings</a>
-      <a class="sidebar-item" href="#">Admin Panel</a>
+      <a class="sidebar-item admin-only hidden" href="#" onclick="showPanel('admin');return false;">Admin Panel</a>
     </div>
 
+    <!-- Content area — switchable panels -->
     <div class="content">
-      <div class="section-header">
-        <div class="section-title">Recent Workouts</div>
-        <button class="btn-ghost">View All</button>
-      </div>
 
-      <table class="workout-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Exercise</th>
-            <th>Sets &times; Reps</th>
-            <th>Weight</th>
-            <th>Volume</th>
-            <th>Progress</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Apr 10</td>
-            <td><strong>Bench Press</strong></td>
-            <td>4 &times; 8</td>
-            <td>185 lbs</td>
-            <td>5,920 lbs</td>
-            <td><span class="badge badge-green">&#8593; PR</span></td>
-          </tr>
-          <tr>
-            <td>Apr 10</td>
-            <td><strong>Squat</strong></td>
-            <td>5 &times; 5</td>
-            <td>225 lbs</td>
-            <td>5,625 lbs</td>
-            <td><span class="badge badge-blue">Same</span></td>
-          </tr>
-          <tr>
-            <td>Apr 8</td>
-            <td><strong>Deadlift</strong></td>
-            <td>3 &times; 5</td>
-            <td>315 lbs</td>
-            <td>4,725 lbs</td>
-            <td><span class="badge badge-green">&#8593; +10</span></td>
-          </tr>
-          <tr>
-            <td>Apr 7</td>
-            <td><strong>Overhead Press</strong></td>
-            <td>4 &times; 6</td>
-            <td>115 lbs</td>
-            <td>2,760 lbs</td>
-            <td><span class="badge badge-red">&#8595; &minus;5</span></td>
-          </tr>
-          <tr>
-            <td>Apr 5</td>
-            <td><strong>Pull-Up</strong></td>
-            <td>3 &times; 10</td>
-            <td>BW+25</td>
-            <td>&mdash;</td>
-            <td><span class="badge badge-green">&#8593; +2 reps</span></td>
-          </tr>
-          <tr>
-            <td>Apr 3</td>
-            <td><strong>Romanian Deadlift</strong></td>
-            <td>3 &times; 8</td>
-            <td>185 lbs</td>
-            <td>4,440 lbs</td>
-            <td><span class="badge badge-blue">Same</span></td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- ---- Panel: Workouts ---- -->
+      <div id="panel-workouts">
 
-      <div class="chart-section">
-        <div class="section-title" style="font-size:18px;">Volume This Week</div>
-        <div class="chart-bars">
-          <div class="chart-col">
-            <div class="chart-bar empty" style="height:24px;"></div>
-            <span class="chart-day">Mon</span>
+        <!-- Workout log form (hidden by default) -->
+        <div id="workout-form-card" class="workout-form-card hidden">
+          <div class="section-header" style="margin-bottom:16px;">
+            <div class="section-title">Log a Workout</div>
+            <button class="btn-ghost" onclick="toggleWorkoutForm()">&times; Close</button>
           </div>
-          <div class="chart-col">
-            <div class="chart-bar" style="height:55px;"></div>
-            <span class="chart-day">Tue</span>
-          </div>
-          <div class="chart-col">
-            <div class="chart-bar empty" style="height:16px;"></div>
-            <span class="chart-day">Wed</span>
-          </div>
-          <div class="chart-col">
-            <div class="chart-bar" style="height:72px;"></div>
-            <span class="chart-day">Thu</span>
-          </div>
-          <div class="chart-col">
-            <div class="chart-bar" style="height:44px;"></div>
-            <span class="chart-day">Fri</span>
-          </div>
-          <div class="chart-col">
-            <div class="chart-bar empty" style="height:10px;"></div>
-            <span class="chart-day">Sat</span>
-          </div>
-          <div class="chart-col">
-            <div class="chart-bar" style="height:62px;"></div>
-            <span class="chart-day">Sun</span>
+          <div class="error-box" id="workout-error"></div>
+          <form onsubmit="return false;" class="workout-form-grid">
+            <div class="field-group" style="position:relative;">
+              <label class="field-label">Exercise</label>
+              <input class="field-input" id="wf-exercise" type="text" placeholder="e.g. Bench Press"
+                autocomplete="off" oninput="onExerciseInput(this.value)">
+              <div id="exercise-dropdown" class="exercise-dropdown hidden"></div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Date</label>
+              <input class="field-input" id="wf-date" type="date">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Sets</label>
+              <input class="field-input" id="wf-sets" type="number" min="1" placeholder="4">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Reps</label>
+              <input class="field-input" id="wf-reps" type="number" min="1" placeholder="8">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Weight (lbs)</label>
+              <input class="field-input" id="wf-weight" type="number" min="0" step="0.5" placeholder="135">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Duration (min)</label>
+              <input class="field-input" id="wf-duration" type="number" min="0" placeholder="45">
+            </div>
+          </form>
+          <button class="btn-main" style="max-width:200px;margin-top:4px;" onclick="handleWorkoutSubmit()">Save Workout</button>
+        </div>
+
+        <!-- Recent Workouts table -->
+        <div class="section-header" style="margin-top:8px;">
+          <div class="section-title">Recent Workouts</div>
+          <button class="btn-ghost">View All</button>
+        </div>
+
+        <table class="workout-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Exercise</th>
+              <th>Sets &times; Reps</th>
+              <th>Weight</th>
+              <th>Volume</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody id="workout-tbody">
+            <tr><td colspan="6" class="empty-row">No workouts yet. Log your first one!</td></tr>
+          </tbody>
+        </table>
+
+        <!-- Charts -->
+        <div class="chart-section" style="margin-top:36px;">
+          <div class="section-title" style="font-size:18px;margin-bottom:16px;">Volume Over Time</div>
+          <div class="chart-container">
+            <canvas id="volume-chart"></canvas>
           </div>
         </div>
-      </div>
-    </div>
 
+        <div class="chart-section" style="margin-top:28px;">
+          <div class="section-title" style="font-size:18px;margin-bottom:16px;">Weekly Frequency</div>
+          <div class="chart-container">
+            <canvas id="frequency-chart"></canvas>
+          </div>
+        </div>
+
+      </div><!-- /#panel-workouts -->
+
+      <!-- ---- Panel: Admin ---- -->
+      <div id="panel-admin" class="hidden">
+        <div class="section-header">
+          <div class="section-title">Admin Dashboard</div>
+          <button class="btn-ghost" onclick="loadAdminPanel()">&#8635; Refresh</button>
+        </div>
+
+        <div class="admin-section-label">Users</div>
+        <table class="workout-table" style="margin-bottom:32px;">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Workouts</th>
+              <th>2FA</th>
+            </tr>
+          </thead>
+          <tbody id="admin-users-tbody">
+            <tr><td colspan="5" class="empty-row">Loading&hellip;</td></tr>
+          </tbody>
+        </table>
+
+        <div class="admin-section-label">All Workouts</div>
+        <table class="workout-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Date</th>
+              <th>Exercise</th>
+              <th>Sets &times; Reps</th>
+              <th>Weight</th>
+              <th>Duration</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-workouts-tbody">
+            <tr><td colspan="7" class="empty-row">Loading&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div><!-- /#panel-admin -->
+
+    </div><!-- /.content -->
+
+    <!-- Right panel -->
     <div class="right-panel">
+
+      <!-- Browse Exercises (Wger API) -->
+      <div id="browse-exercises-card">
+        <div class="panel-title">Browse Exercises</div>
+        <div class="field-group">
+          <label class="field-label">Muscle Group</label>
+          <select class="field-input" id="muscle-select" onchange="loadExercisesByMuscle(this.value)">
+            <option value="">-- Select a muscle --</option>
+          </select>
+        </div>
+        <div id="exercise-list" class="exercise-grid"></div>
+      </div>
+
+      <!-- Weekly Goals (static decorative) -->
       <div>
         <div class="panel-title">Weekly Goals</div>
         <div class="circles-row">
@@ -264,52 +330,66 @@
         </div>
       </div>
 
-      <div>
-        <div class="panel-title">Top Lifts vs PR</div>
-        <div class="prog-row">
-          <div class="prog-meta"><strong>Bench Press</strong><span>185 / 210 lbs</span></div>
-          <div class="prog-bar"><div class="prog-fill" style="width:88%"></div></div>
+      <!-- 2FA Settings -->
+      <div id="twofa-settings">
+        <div class="panel-title">Two-Factor Authentication</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" id="twofa-status-text">
+          2FA status: checking&hellip;
         </div>
-        <div class="prog-row">
-          <div class="prog-meta"><strong>Squat</strong><span>225 / 275 lbs</span></div>
-          <div class="prog-bar"><div class="prog-fill" style="width:82%"></div></div>
+        <button class="btn-ghost" id="twofa-toggle-btn" style="width:100%;font-size:12px;" onclick="toggle2FA()">
+          Loading&hellip;
+        </button>
+        <div id="twofa-success" style="display:none;font-size:12px;color:var(--green);margin-top:10px;line-height:1.5;">
+          2FA is now enabled. You will receive a code by email each time you log in.
         </div>
-        <div class="prog-row">
-          <div class="prog-meta"><strong>Deadlift</strong><span>315 / 365 lbs</span></div>
-          <div class="prog-bar"><div class="prog-fill" style="width:86%;background:var(--blue)"></div></div>
-        </div>
-        <div class="prog-row">
-          <div class="prog-meta"><strong>OHP</strong><span>115 / 145 lbs</span></div>
-          <div class="prog-bar"><div class="prog-fill" style="width:79%"></div></div>
-        </div>
+        <div class="error-box" id="twofa-error" style="margin-top:10px;"></div>
       </div>
 
-      <div>
-        <div class="panel-title">Last Workout</div>
-        <div class="recent-card">
-          <div class="recent-title">Push Day A</div>
-          <div class="recent-meta">Apr 10, 2026 &middot; 58 min</div>
-          <div class="mini-stats">
-            <div class="mini-stat">
-              <span class="val">4</span>
-              <span class="lbl">Exercises</span>
-            </div>
-            <div class="mini-stat">
-              <span class="val">17</span>
-              <span class="lbl">Sets</span>
-            </div>
-            <div class="mini-stat">
-              <span class="val">8,680</span>
-              <span class="lbl">Volume lbs</span>
-            </div>
-          </div>
-        </div>
+    </div><!-- /.right-panel -->
+
+  </div><!-- /.main -->
+</div><!-- /#view-dashboard -->
+
+<!-- ===================== EDIT MODAL (admin) ===================== -->
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-title">Edit Workout</div>
+    <input type="hidden" id="modal-workout-id">
+    <div class="workout-form-grid" style="margin-top:16px;">
+      <div class="field-group">
+        <label class="field-label">Exercise</label>
+        <input class="field-input" id="modal-exercise" type="text">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Date</label>
+        <input class="field-input" id="modal-date" type="date">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Sets</label>
+        <input class="field-input" id="modal-sets" type="number" min="1">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Reps</label>
+        <input class="field-input" id="modal-reps" type="number" min="1">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Weight (lbs)</label>
+        <input class="field-input" id="modal-weight" type="number" min="0" step="0.5">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Duration (min)</label>
+        <input class="field-input" id="modal-duration" type="number" min="0">
       </div>
     </div>
-
+    <div class="error-box" id="modal-error" style="margin-top:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEditModal()">Save Changes</button>
+    </div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
