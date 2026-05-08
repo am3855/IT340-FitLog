@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, session, render_template
+from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -23,6 +24,9 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fitlog-dev-secret-key')
 
+FRONTEND_ORIGIN = os.environ.get('FRONTEND_ORIGIN', '')
+CORS(app, origins=FRONTEND_ORIGIN or '*', supports_credentials=True)
+
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600
@@ -39,10 +43,11 @@ WGER_BASE = 'https://wger.de/api/v2'
 MAIL_EMAIL    = os.environ.get('MAIL_EMAIL', '')
 MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
 
+_client = MongoClient(MONGO_HOST, MONGO_PORT)
+
 
 def get_db():
-    client = MongoClient(MONGO_HOST, MONGO_PORT)
-    return client[MONGO_DB]
+    return _client[MONGO_DB]
 
 
 def get_users():
@@ -162,7 +167,7 @@ def index():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data       = request.get_json()
+    data       = request.get_json() or {}
     first_name = data.get('first_name', '').strip()
     last_name  = data.get('last_name', '').strip()
     email      = data.get('email', '').strip().lower()
@@ -202,7 +207,7 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data     = request.get_json()
+    data     = request.get_json() or {}
     email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
 
@@ -646,4 +651,4 @@ def add_security_headers(response):
 
 if __name__ == '__main__':
     init_db()
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
