@@ -78,6 +78,12 @@ def validate_name(name):
     return bool(re.match(r"^[a-zA-Z\s\-']+$", name))
 
 
+def validate_username(username):
+    if not username or len(username) > 30:
+        return False
+    return bool(re.match(r'^[a-zA-Z0-9_.\-]+$', username))
+
+
 def validate_email(email):
     if not email or len(email) > 254:
         return False
@@ -128,10 +134,25 @@ def send_2fa_email(to_email, code):
 
 def _create_session(user):
     session['email']       = user['email']
+    session['username']    = user.get('username', '')
     session['first_name']  = user['first_name']
     session['last_name']   = user['last_name']
     session['is_admin']    = user.get('is_admin', False)
     session['2fa_enabled'] = user.get('2fa_enabled', False)
+
+
+def _serialize_user(user):
+    created_at = user.get('created_at')
+    return {
+        'user_id':    user.get('user_id', ''),
+        'username':   user.get('username', ''),
+        'first_name': user['first_name'],
+        'last_name':  user['last_name'],
+        'email':      user['email'],
+        'is_admin':   user.get('is_admin', False),
+        '2fa_enabled': user.get('2fa_enabled', False),
+        'created_at': created_at.isoformat() if created_at else None,
+    }
 
 
 def init_db():
@@ -144,15 +165,27 @@ def init_db():
         'duo_2fa_enabled': '',
         'duo_username': '',
     }})
+    # Backfill username for existing users that don't have one
+    for u in users.find({'username': {'$exists': False}}):
+        base = re.sub(r'[^a-z0-9]', '', (u.get('first_name', '') + u.get('last_name', '')).lower()) or 'user'
+        candidate, suffix = base, 1
+        while users.find_one({'username': candidate, '_id': {'$ne': u['_id']}}):
+            candidate = base + str(suffix)
+            suffix += 1
+        users.update_one({'_id': u['_id']}, {'$set': {'username': candidate}})
+    # Backfill created_at for existing users (set to None if missing)
+    users.update_many({'created_at': {'$exists': False}}, {'$set': {'created_at': None}})
     if not users.find_one({'email': 'admin@fitlog.com'}):
         users.insert_one({
-            'user_id': str(uuid.uuid4()),
-            'email': 'admin@fitlog.com',
-            'first_name': 'Admin',
-            'last_name': 'FitLog',
+            'user_id':       str(uuid.uuid4()),
+            'email':         'admin@fitlog.com',
+            'username':      'admin',
+            'first_name':    'Admin',
+            'last_name':     'FitLog',
             'password_hash': generate_password_hash('Admin123!'),
-            'is_admin': True,
-            '2fa_enabled': False,
+            'is_admin':      True,
+            '2fa_enabled':   False,
+            'created_at':    datetime.utcnow(),
         })
 
 
@@ -182,27 +215,30 @@ def register():
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters.'}), 400
 
+    base_username = re.sub(r'[^a-z0-9]', '', (first_name + last_name).lower()) or 'user'
+    username, suffix = base_username, 1
+    while get_users().find_one({'username': username}):
+        username = base_username + str(suffix)
+        suffix += 1
+
     try:
         get_users().insert_one({
-            'user_id': str(uuid.uuid4()),
-            'email': email,
-            'first_name': first_name,
-            'last_name': last_name,
+            'user_id':       str(uuid.uuid4()),
+            'email':         email,
+            'username':      username,
+            'first_name':    first_name,
+            'last_name':     last_name,
             'password_hash': generate_password_hash(password),
-            'is_admin': False,
-            '2fa_enabled': False,
+            'is_admin':      False,
+            '2fa_enabled':   False,
+            'created_at':    datetime.utcnow(),
         })
     except DuplicateKeyError:
         return jsonify({'error': 'An account with that email already exists.'}), 409
 
     user = get_users().find_one({'email': email})
     _create_session(user)
-    return jsonify({'success': True, 'user': {
-        'first_name': first_name,
-        'last_name': last_name,
-        'email': email,
-        'is_admin': False,
-    }})
+    return jsonify({'success': True, 'user': _serialize_user(user)})
 
 
 @app.route('/api/login', methods=['POST'])
@@ -236,25 +272,18 @@ def login():
         return jsonify({'success': True, 'requires_2fa': True})
 
     _create_session(user)
-    return jsonify({'success': True, 'requires_2fa': False, 'user': {
-        'first_name': user['first_name'],
-        'last_name': user['last_name'],
-        'email': user['email'],
-        'is_admin': user.get('is_admin', False),
-    }})
+    return jsonify({'success': True, 'requires_2fa': False, 'user': _serialize_user(user)})
 
 
 @app.route('/api/me')
 def me():
-    if 'email' in session:
-        return jsonify({'logged_in': True, 'user': {
-            'first_name': session['first_name'],
-            'last_name': session['last_name'],
-            'email': session['email'],
-            'is_admin': session.get('is_admin', False),
-            '2fa_enabled': session.get('2fa_enabled', False),
-        }})
-    return jsonify({'logged_in': False})
+    if 'email' not in session:
+        return jsonify({'logged_in': False})
+    user = get_users().find_one({'email': session['email']})
+    if not user:
+        session.clear()
+        return jsonify({'logged_in': False})
+    return jsonify({'logged_in': True, 'user': _serialize_user(user)})
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -333,6 +362,7 @@ def admin_get_users():
         user_workouts = list(get_workouts().find({'user_email': u['email']}))
         result.append({
             'user_id': u.get('user_id', ''),
+            'username': u.get('username', ''),
             'email': u.get('email', ''),
             'first_name': u.get('first_name', ''),
             'last_name': u.get('last_name', ''),
@@ -537,6 +567,117 @@ def get_exercises_by_muscle():
 
 
 # ---------------------------------------------------------------------------
+# Admin user management routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/admin/users/<user_id>/toggle-2fa', methods=['PUT'])
+def admin_toggle_2fa(user_id):
+    err = require_admin()
+    if err:
+        return err
+
+    user = get_users().find_one({'user_id': user_id})
+    if not user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    new_val = not user.get('2fa_enabled', False)
+    update = {'$set': {'2fa_enabled': new_val}}
+    if not new_val:
+        update['$unset'] = {'2fa_code': '', '2fa_expires': ''}
+    get_users().update_one({'user_id': user_id}, update)
+    return jsonify({'success': True, '2fa_enabled': new_val})
+
+
+@app.route('/api/admin/users/<user_id>/email', methods=['PUT'])
+def admin_update_email(user_id):
+    err = require_admin()
+    if err:
+        return err
+
+    data  = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    if not validate_email(email):
+        return jsonify({'error': 'Invalid email address.'}), 400
+
+    user = get_users().find_one({'user_id': user_id})
+    if not user:
+        return jsonify({'error': 'User not found.'}), 404
+
+    if get_users().find_one({'email': email, 'user_id': {'$ne': user_id}}):
+        return jsonify({'error': 'That email is already in use.'}), 409
+
+    old_email = user['email']
+    get_users().update_one({'user_id': user_id}, {'$set': {'email': email}})
+    get_workouts().update_many({'user_email': old_email}, {'$set': {'user_email': email}})
+    return jsonify({'success': True, 'email': email})
+
+
+@app.route('/api/admin/users/<user_id>/username', methods=['PUT'])
+def admin_update_username(user_id):
+    err = require_admin()
+    if err:
+        return err
+
+    data     = request.get_json() or {}
+    username = data.get('username', '').strip()
+    if not validate_username(username):
+        return jsonify({'error': 'Username must be 1-30 characters (letters, numbers, _ . -)'}), 400
+
+    if not get_users().find_one({'user_id': user_id}):
+        return jsonify({'error': 'User not found.'}), 404
+
+    if get_users().find_one({'username': username, 'user_id': {'$ne': user_id}}):
+        return jsonify({'error': 'That username is already taken.'}), 409
+
+    get_users().update_one({'user_id': user_id}, {'$set': {'username': username}})
+    return jsonify({'success': True, 'username': username})
+
+
+# ---------------------------------------------------------------------------
+# User self-service routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/user/username', methods=['PUT'])
+def user_update_username():
+    err = require_login()
+    if err:
+        return err
+
+    data     = request.get_json() or {}
+    username = data.get('username', '').strip()
+    if not validate_username(username):
+        return jsonify({'error': 'Username must be 1-30 characters (letters, numbers, _ . -)'}), 400
+
+    if get_users().find_one({'username': username, 'email': {'$ne': session['email']}}):
+        return jsonify({'error': 'That username is already taken.'}), 409
+
+    get_users().update_one({'email': session['email']}, {'$set': {'username': username}})
+    session['username'] = username
+    return jsonify({'success': True, 'username': username})
+
+
+@app.route('/api/user/email', methods=['PUT'])
+def user_update_email():
+    err = require_login()
+    if err:
+        return err
+
+    data      = request.get_json() or {}
+    new_email = data.get('email', '').strip().lower()
+    if not validate_email(new_email):
+        return jsonify({'error': 'Invalid email address.'}), 400
+
+    if new_email != session['email'] and get_users().find_one({'email': new_email}):
+        return jsonify({'error': 'That email is already in use.'}), 409
+
+    old_email = session['email']
+    get_users().update_one({'email': old_email}, {'$set': {'email': new_email}})
+    get_workouts().update_many({'user_email': old_email}, {'$set': {'user_email': new_email}})
+    session['email'] = new_email
+    return jsonify({'success': True, 'email': new_email})
+
+
+# ---------------------------------------------------------------------------
 # Email 2FA routes
 # ---------------------------------------------------------------------------
 
@@ -577,12 +718,7 @@ def verify_2fa():
     get_users().update_one({'email': email}, {'$unset': {'2fa_code': '', '2fa_expires': ''}})
     session.pop('pending_2fa_email', None)
     _create_session(user)
-    return jsonify({'success': True, 'user': {
-        'first_name': user['first_name'],
-        'last_name': user['last_name'],
-        'email': user['email'],
-        'is_admin': user.get('is_admin', False),
-    }})
+    return jsonify({'success': True, 'user': _serialize_user(user)})
 
 
 @app.route('/api/2fa/resend', methods=['POST'])

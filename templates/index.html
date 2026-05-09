@@ -158,8 +158,7 @@
       <div class="sidebar-label">Tracking</div>
       <a class="sidebar-item" href="#" onclick="showPanel('workouts');return false;">History</a>
       <div class="sidebar-label">Account</div>
-      <a class="sidebar-item" href="#">Profile</a>
-      <a class="sidebar-item" href="#">Settings</a>
+      <a class="sidebar-item" href="#" onclick="showPanel('settings');return false;">Settings</a>
       <a class="sidebar-item admin-only hidden" href="#" onclick="showPanel('admin');return false;">Admin Panel</a>
     </div>
 
@@ -258,14 +257,16 @@
           <thead>
             <tr>
               <th>Name</th>
+              <th>Username</th>
               <th>Email</th>
               <th>Role</th>
               <th>Workouts</th>
               <th>2FA</th>
+              <th>Feedback</th>
             </tr>
           </thead>
           <tbody id="admin-users-tbody">
-            <tr><td colspan="5" class="empty-row">Loading&hellip;</td></tr>
+            <tr><td colspan="7" class="empty-row">Loading&hellip;</td></tr>
           </tbody>
         </table>
 
@@ -287,6 +288,64 @@
           </tbody>
         </table>
       </div><!-- /#panel-admin -->
+
+      <!-- ---- Panel: Settings ---- -->
+      <div id="panel-settings" class="hidden">
+        <div class="section-header">
+          <div class="section-title">Settings</div>
+          <button class="btn-ghost" onclick="showPanel('workouts');return false;">&larr; Back to Dashboard</button>
+        </div>
+
+        <!-- Account Info -->
+        <div class="settings-card">
+          <div class="settings-card-title">Account Info</div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Username</span>
+            <span class="settings-info-value" id="settings-username">&mdash;</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Email</span>
+            <span class="settings-info-value" id="settings-email">&mdash;</span>
+          </div>
+          <div class="settings-info-row">
+            <span class="settings-info-label">Member Since</span>
+            <span class="settings-info-value" id="settings-created">&mdash;</span>
+          </div>
+        </div>
+
+        <!-- Change Username -->
+        <div class="settings-card">
+          <div class="settings-card-title">Change Username</div>
+          <div class="field-group" style="margin-bottom:8px;">
+            <label class="field-label" for="settings-new-username">New Username</label>
+            <input class="field-input" id="settings-new-username" type="text" placeholder="Enter new username" maxlength="30">
+          </div>
+          <div class="settings-msg" id="settings-username-msg"></div>
+          <button class="btn-primary" style="margin-top:10px;" onclick="saveSettingsUsername()">Save Username</button>
+        </div>
+
+        <!-- Change Email -->
+        <div class="settings-card">
+          <div class="settings-card-title">Change Email</div>
+          <div class="field-group" style="margin-bottom:8px;">
+            <label class="field-label" for="settings-new-email">New Email Address</label>
+            <input class="field-input" id="settings-new-email" type="email" placeholder="Enter new email">
+          </div>
+          <div class="settings-msg" id="settings-email-msg"></div>
+          <button class="btn-primary" style="margin-top:10px;" onclick="saveSettingsEmail()">Save Email</button>
+        </div>
+
+        <!-- 2FA -->
+        <div class="settings-card">
+          <div class="settings-card-title">Two-Factor Authentication</div>
+          <div class="settings-info-row" style="border-bottom:none;">
+            <span class="settings-info-label">Status</span>
+            <span class="settings-info-value" id="settings-2fa-status">&mdash;</span>
+          </div>
+          <div class="settings-msg" id="settings-2fa-msg"></div>
+          <button class="btn-ghost" id="settings-2fa-btn" style="margin-top:12px;width:100%;font-size:13px;" onclick="settingsToggle2FA()">Loading&hellip;</button>
+        </div>
+      </div><!-- /#panel-settings -->
 
     </div><!-- /.content -->
 

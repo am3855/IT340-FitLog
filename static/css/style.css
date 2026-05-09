@@ -741,8 +741,63 @@ nav ul li a.active { color: var(--text); }
 #view-email2fa .auth-card { max-width: 420px; }
 
 /* =========================================================
+   SETTINGS PANEL
+   ========================================================= */
+
+.settings-card {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.settings-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.settings-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-info-row:last-of-type { border-bottom: none; }
+
+.settings-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.settings-info-value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.settings-msg {
+  font-size: 12px;
+  min-height: 16px;
+  margin-top: 6px;
+}
+
+.admin-feedback-cell {
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+/* =========================================================
    PANEL VISIBILITY
    ========================================================= */
 
-#panel-workouts, #panel-admin { min-height: 200px; }
+#panel-workouts, #panel-admin, #panel-settings { min-height: 200px; }
 

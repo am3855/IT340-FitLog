@@ -21,7 +21,7 @@ function showView(name) {
 }
 
 function showPanel(name) {
-  ['workouts', 'admin'].forEach(function (p) {
+  ['workouts', 'admin', 'settings'].forEach(function (p) {
     var el = document.getElementById('panel-' + p);
     if (el) el.classList.add('hidden');
   });
@@ -29,6 +29,7 @@ function showPanel(name) {
   if (target) target.classList.remove('hidden');
 
   if (name === 'admin') loadAdminPanel();
+  if (name === 'settings') loadSettings();
 }
 
 // ---------------------------------------------------------------------------
@@ -471,22 +472,134 @@ async function loadAdminPanel() {
 function renderAdminUsers(users) {
   var tbody = document.getElementById('admin-users-tbody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No users found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No users found.</td></tr>';
     return;
   }
   tbody.innerHTML = users.map(function (u) {
+    var uid = escapeAttr(u.user_id);
     return '<tr>'
       + '<td>' + escapeHtml(u.first_name) + ' ' + escapeHtml(u.last_name) + '</td>'
-      + '<td>' + escapeHtml(u.email) + '</td>'
+      // Username cell with inline edit
+      + '<td>'
+        + '<div id="u-disp-' + uid + '">'
+          + '<span id="u-txt-' + uid + '">' + escapeHtml(u.username) + '</span>'
+          + ' <button class="btn-ghost admin-btn" style="font-size:11px;padding:2px 6px;"'
+          + ' data-uid="' + uid + '" data-type="username" onclick="adminStartEdit(this)">Edit</button>'
+        + '</div>'
+        + '<div id="u-form-' + uid + '" style="display:none;gap:4px;align-items:center;">'
+          + '<input class="field-input" id="u-inp-' + uid + '" type="text"'
+          + ' value="' + escapeAttr(u.username) + '"'
+          + ' style="font-size:12px;padding:4px 8px;width:110px;">'
+          + '<button class="btn-primary admin-btn" style="font-size:11px;padding:3px 8px;"'
+          + ' data-uid="' + uid + '" data-type="username" onclick="adminSaveEdit(this)">Save</button>'
+          + '<button class="btn-ghost admin-btn" style="font-size:11px;padding:3px 8px;"'
+          + ' data-uid="' + uid + '" data-type="username" onclick="adminCancelEdit(this)">Cancel</button>'
+        + '</div>'
+      + '</td>'
+      // Email cell with inline edit
+      + '<td>'
+        + '<div id="e-disp-' + uid + '">'
+          + '<span id="e-txt-' + uid + '">' + escapeHtml(u.email) + '</span>'
+          + ' <button class="btn-ghost admin-btn" style="font-size:11px;padding:2px 6px;"'
+          + ' data-uid="' + uid + '" data-type="email" onclick="adminStartEdit(this)">Edit</button>'
+        + '</div>'
+        + '<div id="e-form-' + uid + '" style="display:none;gap:4px;align-items:center;">'
+          + '<input class="field-input" id="e-inp-' + uid + '" type="email"'
+          + ' value="' + escapeAttr(u.email) + '"'
+          + ' style="font-size:12px;padding:4px 8px;width:160px;">'
+          + '<button class="btn-primary admin-btn" style="font-size:11px;padding:3px 8px;"'
+          + ' data-uid="' + uid + '" data-type="email" onclick="adminSaveEdit(this)">Save</button>'
+          + '<button class="btn-ghost admin-btn" style="font-size:11px;padding:3px 8px;"'
+          + ' data-uid="' + uid + '" data-type="email" onclick="adminCancelEdit(this)">Cancel</button>'
+        + '</div>'
+      + '</td>'
       + '<td>' + (u.is_admin
         ? '<span class="badge badge-green">Admin</span>'
         : '<span class="badge badge-blue">User</span>') + '</td>'
       + '<td>' + escapeHtml(u.workouts.length) + '</td>'
-      + '<td>' + (u['2fa_enabled']
-        ? '<span class="badge badge-green">On</span>'
-        : '<span class="badge badge-blue">Off</span>') + '</td>'
+      + '<td>' + admin2FACell(uid, u['2fa_enabled']) + '</td>'
+      + '<td class="admin-feedback-cell"><span id="adminfb-' + uid + '"></span></td>'
       + '</tr>';
   }).join('');
+}
+
+function admin2FACell(uid, enabled) {
+  return (enabled
+    ? '<span class="badge badge-green">On</span>'
+    : '<span class="badge badge-blue">Off</span>')
+    + ' <button class="btn-ghost admin-btn" style="font-size:11px;padding:2px 6px;"'
+    + ' data-uid="' + uid + '" onclick="adminToggle2FA(this)">Toggle</button>';
+}
+
+function adminStartEdit(btn) {
+  var uid    = btn.dataset.uid;
+  var type   = btn.dataset.type;
+  var prefix = type === 'username' ? 'u' : 'e';
+  document.getElementById(prefix + '-disp-' + uid).style.display = 'none';
+  var form = document.getElementById(prefix + '-form-' + uid);
+  form.style.display = 'flex';
+}
+
+function adminCancelEdit(btn) {
+  var uid    = btn.dataset.uid;
+  var type   = btn.dataset.type;
+  var prefix = type === 'username' ? 'u' : 'e';
+  document.getElementById(prefix + '-form-' + uid).style.display = 'none';
+  document.getElementById(prefix + '-disp-' + uid).style.display = '';
+}
+
+async function adminSaveEdit(btn) {
+  var uid    = btn.dataset.uid;
+  var type   = btn.dataset.type;
+  var prefix = type === 'username' ? 'u' : 'e';
+  var val    = document.getElementById(prefix + '-inp-' + uid).value.trim();
+
+  var body = {};
+  body[type] = val;
+
+  var res  = await fetch('/api/admin/users/' + uid + '/' + type, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    adminShowFeedback(uid, data.error || 'Error saving.', false);
+    return;
+  }
+
+  document.getElementById(prefix + '-txt-' + uid).textContent = val;
+  document.getElementById(prefix + '-inp-' + uid).value = val;
+  document.getElementById(prefix + '-form-' + uid).style.display = 'none';
+  document.getElementById(prefix + '-disp-' + uid).style.display = '';
+  adminShowFeedback(uid, (type === 'username' ? 'Username' : 'Email') + ' updated.', true);
+}
+
+async function adminToggle2FA(btn) {
+  var uid = btn.dataset.uid;
+  var res = await fetch('/api/admin/users/' + uid + '/toggle-2fa', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    adminShowFeedback(uid, data.error || 'Failed to toggle 2FA.', false);
+    return;
+  }
+
+  var cell = btn.closest('td');
+  cell.innerHTML = admin2FACell(uid, data['2fa_enabled']);
+  adminShowFeedback(uid, '2FA ' + (data['2fa_enabled'] ? 'enabled' : 'disabled') + '.', true);
+}
+
+function adminShowFeedback(uid, msg, success) {
+  var el = document.getElementById('adminfb-' + uid);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = success ? 'var(--green)' : 'var(--red)';
+  setTimeout(function () { if (el) el.textContent = ''; }, 4000);
 }
 
 function renderAdminWorkouts(users) {
@@ -752,6 +865,130 @@ async function toggle2FA() {
     var success = document.getElementById('twofa-success');
     if (success) success.style.display = 'block';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Settings panel
+// ---------------------------------------------------------------------------
+function loadSettings() {
+  if (!currentUser) return;
+  var u = currentUser;
+
+  document.getElementById('settings-username').textContent = u.username || '—';
+  document.getElementById('settings-email').textContent    = u.email    || '—';
+
+  var createdEl = document.getElementById('settings-created');
+  if (u.created_at) {
+    var d = new Date(u.created_at);
+    createdEl.textContent = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  } else {
+    createdEl.textContent = '—';
+  }
+
+  document.getElementById('settings-new-username').value = '';
+  document.getElementById('settings-new-email').value    = '';
+  document.getElementById('settings-username-msg').textContent = '';
+  document.getElementById('settings-email-msg').textContent    = '';
+  document.getElementById('settings-2fa-msg').textContent      = '';
+
+  updateSettings2FADisplay();
+}
+
+function updateSettings2FADisplay() {
+  var enabled    = currentUser && currentUser['2fa_enabled'];
+  var statusEl   = document.getElementById('settings-2fa-status');
+  var btn        = document.getElementById('settings-2fa-btn');
+  if (statusEl) statusEl.textContent = enabled ? 'Enabled (email code)' : 'Disabled';
+  if (btn) {
+    btn.textContent        = enabled ? 'Disable 2FA' : 'Enable 2FA (email)';
+    btn.style.borderColor  = enabled ? 'var(--red)' : '';
+    btn.style.color        = enabled ? 'var(--red)' : '';
+  }
+}
+
+async function saveSettingsUsername() {
+  var msgEl    = document.getElementById('settings-username-msg');
+  var username = document.getElementById('settings-new-username').value.trim();
+  if (!username) {
+    msgEl.textContent = 'Please enter a username.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  var res  = await fetch('/api/user/username', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username }),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    msgEl.textContent = data.error || 'Failed to update username.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  currentUser.username = data.username;
+  document.getElementById('settings-username').textContent = data.username;
+  document.getElementById('settings-new-username').value   = '';
+  msgEl.textContent = 'Username updated successfully.';
+  msgEl.style.color = 'var(--green)';
+}
+
+async function saveSettingsEmail() {
+  var msgEl = document.getElementById('settings-email-msg');
+  var email = document.getElementById('settings-new-email').value.trim();
+  if (!email) {
+    msgEl.textContent = 'Please enter an email address.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  var res  = await fetch('/api/user/email', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email }),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    msgEl.textContent = data.error || 'Failed to update email.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  currentUser.email = data.email;
+  document.getElementById('settings-email').textContent = data.email;
+  document.getElementById('settings-new-email').value   = '';
+  msgEl.textContent = 'Email updated successfully.';
+  msgEl.style.color = 'var(--green)';
+}
+
+async function settingsToggle2FA() {
+  var msgEl  = document.getElementById('settings-2fa-msg');
+  msgEl.textContent = '';
+  var enable = !(currentUser && currentUser['2fa_enabled']);
+  var url    = enable ? '/api/2fa/enroll' : '/api/2fa/disable';
+
+  var res  = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enable: enable }),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    msgEl.textContent = data.error || 'Failed to update 2FA settings.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  if (currentUser) currentUser['2fa_enabled'] = data['2fa_enabled'];
+  twoFaEnabled = data['2fa_enabled'];
+  updateSettings2FADisplay();
+  renderTwoFAStatus();
+  msgEl.textContent = data['2fa_enabled'] ? '2FA enabled. You will receive a code by email each time you log in.' : '2FA disabled.';
+  msgEl.style.color = data['2fa_enabled'] ? 'var(--green)' : 'var(--muted)';
 }
 
 // ---------------------------------------------------------------------------
