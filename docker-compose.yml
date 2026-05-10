@@ -17,6 +17,7 @@ services:
       SECRET_KEY: dev-secret-key
       MAIL_EMAIL: ${MAIL_EMAIL:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       - mongodb
 

@@ -26,15 +26,16 @@ function showView(name) {
 }
 
 function showPanel(name) {
-  ['workouts', 'admin', 'settings'].forEach(function (p) {
+  ['workouts', 'admin', 'settings', 'ai'].forEach(function (p) {
     var el = document.getElementById('panel-' + p);
     if (el) el.classList.add('hidden');
   });
   var target = document.getElementById('panel-' + name);
   if (target) target.classList.remove('hidden');
 
-  if (name === 'admin') loadAdminPanel();
+  if (name === 'admin')    loadAdminPanel();
   if (name === 'settings') loadSettings();
+  if (name === 'ai')       loadAIPanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +282,24 @@ function toggleWorkoutForm() {
     }
     hideError('workout-error');
   }
+}
+
+function showWorkoutForm() {
+  showPanel('workouts');
+  var card = document.getElementById('workout-form-card');
+  card.classList.remove('hidden');
+  var dateInput = document.getElementById('wf-date');
+  if (!dateInput.value) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+  hideError('workout-error');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showWorkoutHistory() {
+  showPanel('workouts');
+  var el = document.getElementById('workout-tbody');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function handleWorkoutSubmit() {
@@ -1403,6 +1422,76 @@ async function settingsToggle2FA() {
   renderTwoFAStatus();
   msgEl.textContent = data['2fa_enabled'] ? '2FA enabled. You will receive a code by email each time you log in.' : '2FA disabled.';
   msgEl.style.color = data['2fa_enabled'] ? 'var(--green)' : 'var(--muted)';
+}
+
+// ---------------------------------------------------------------------------
+// AI Recommendations
+// ---------------------------------------------------------------------------
+function loadAIPanel() {
+  var hasWorkouts = cachedWorkouts && cachedWorkouts.length > 0;
+  var hasMetrics  = currentUser && currentUser.age && currentUser.weight && currentUser.height;
+
+  var noWorkoutsEl = document.getElementById('ai-no-workouts');
+  var noMetricsEl  = document.getElementById('ai-no-metrics');
+  var mainEl       = document.getElementById('ai-main-section');
+
+  if (noWorkoutsEl) noWorkoutsEl.classList.toggle('hidden', hasWorkouts);
+  if (mainEl)       mainEl.classList.toggle('hidden', !hasWorkouts);
+  if (noMetricsEl)  noMetricsEl.classList.toggle('hidden', hasMetrics || !hasWorkouts);
+}
+
+async function getAIRecommendations() {
+  var loadingEl = document.getElementById('ai-loading');
+  var resultsEl = document.getElementById('ai-results');
+  var getBtn    = document.getElementById('ai-get-btn');
+
+  hideError('ai-error');
+  resultsEl.classList.add('hidden');
+  loadingEl.classList.remove('hidden');
+  if (getBtn) getBtn.disabled = true;
+
+  try {
+    var res = await fetch('/api/ai/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workouts: cachedWorkouts || [],
+        metrics: {
+          age:             currentUser ? currentUser.age             : null,
+          weight:          currentUser ? currentUser.weight          : null,
+          height:          currentUser ? currentUser.height          : null,
+          gender:          currentUser ? currentUser.gender          : '',
+          unit_preference: currentUser ? currentUser.unit_preference : 'imperial',
+        },
+      }),
+    });
+    var data = await res.json();
+
+    loadingEl.classList.add('hidden');
+    if (getBtn) getBtn.disabled = false;
+
+    if (!res.ok) {
+      showError('ai-error', data.error || 'Failed to get recommendations.');
+      return;
+    }
+
+    document.getElementById('ai-results-text').innerHTML = formatAIResponse(data.recommendations);
+    resultsEl.classList.remove('hidden');
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    loadingEl.classList.add('hidden');
+    if (getBtn) getBtn.disabled = false;
+    showError('ai-error', 'Unable to generate recommendations right now, please try again later.');
+  }
+}
+
+function formatAIResponse(text) {
+  var escaped = escapeHtml(text);
+  escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/\*(.*?)\*/g,     '<em>$1</em>');
+  escaped = escaped.replace(/\n\n/g, '</p><p class="ai-para">');
+  escaped = escaped.replace(/\n/g,   '<br>');
+  return '<p class="ai-para">' + escaped + '</p>';
 }
 
 // ---------------------------------------------------------------------------

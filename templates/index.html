@@ -120,13 +120,14 @@
     <div class="nav-logo">FIT<span>LOG</span></div>
     <ul>
       <li><a href="#" class="active" onclick="showPanel('workouts');return false;">Dashboard</a></li>
-      <li><a href="#" onclick="showPanel('workouts');return false;">History</a></li>
+      <li><a href="#" onclick="showWorkoutHistory();return false;">History</a></li>
+      <li><a href="#" onclick="showPanel('ai');return false;">AI Recs</a></li>
       <li><a href="#" class="admin-only hidden" onclick="showPanel('admin');return false;">Admin</a></li>
     </ul>
     <div class="nav-right">
       <span class="nav-user" id="nav-username"></span>
       <button class="btn-ghost" onclick="handleLogout()">Log Out</button>
-      <button class="btn-primary" onclick="toggleWorkoutForm()">+ Log Workout</button>
+      <button class="btn-primary" onclick="showWorkoutForm()">+ Log Workout</button>
     </div>
   </nav>
 
@@ -154,9 +155,10 @@
     <!-- Sidebar -->
     <div class="sidebar">
       <a class="sidebar-item active" href="#" onclick="showPanel('workouts');return false;">Dashboard</a>
-      <a class="sidebar-item" href="#" onclick="toggleWorkoutForm();return false;">Log Workout</a>
+      <a class="sidebar-item" href="#" onclick="showWorkoutForm();return false;">Log Workout</a>
       <div class="sidebar-label">Tracking</div>
-      <a class="sidebar-item" href="#" onclick="showPanel('workouts');return false;">History</a>
+      <a class="sidebar-item" href="#" onclick="showWorkoutHistory();return false;">History</a>
+      <a class="sidebar-item" href="#" onclick="showPanel('ai');return false;">AI Recommendations</a>
       <div class="sidebar-label">Account</div>
       <a class="sidebar-item" href="#" onclick="showPanel('settings');return false;">Settings</a>
       <a class="sidebar-item admin-only hidden" href="#" onclick="showPanel('admin');return false;">Admin Panel</a>
@@ -468,6 +470,55 @@
         </div>
 
       </div><!-- /#panel-settings -->
+
+      <!-- ---- Panel: AI Recommendations ---- -->
+      <div id="panel-ai" class="hidden">
+
+        <div class="section-header">
+          <div>
+            <div class="section-title">AI Workout Recommendations</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:4px;">Personalized advice based on your fitness history</div>
+          </div>
+          <button class="btn-ghost" onclick="showPanel('workouts');return false;">&larr; Back to Dashboard</button>
+        </div>
+
+        <!-- No workouts state -->
+        <div id="ai-no-workouts" class="hidden" style="padding:32px;text-align:center;background:var(--charcoal);border:1px solid var(--border);border-radius:12px;margin-bottom:24px;">
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;">No workouts logged yet</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;">Log at least one workout to get AI recommendations.</div>
+          <button class="btn-primary" onclick="showWorkoutForm()">Log a Workout</button>
+        </div>
+
+        <!-- No body metrics notice -->
+        <div id="ai-no-metrics" class="hidden" style="padding:14px 18px;background:rgba(79,168,255,0.07);border:1px solid rgba(79,168,255,0.2);border-radius:10px;font-size:13px;color:var(--blue);margin-bottom:24px;">
+          Add your body metrics in <a href="#" onclick="showPanel('settings');return false;" style="color:var(--green);font-weight:600;">Settings</a> for more personalized recommendations.
+        </div>
+
+        <!-- Main section (shown only when workouts exist) -->
+        <div id="ai-main-section" class="hidden">
+          <div style="margin-bottom:24px;">
+            <button class="btn-primary" id="ai-get-btn" onclick="getAIRecommendations()" style="font-size:14px;padding:10px 28px;">Get My Recommendations</button>
+          </div>
+
+          <div id="ai-loading" class="hidden" style="text-align:center;padding:48px 0;">
+            <div class="ai-spinner"></div>
+            <div style="color:var(--muted);font-size:14px;margin-top:16px;">Analyzing your workout history&hellip;</div>
+          </div>
+
+          <div id="ai-results" class="hidden">
+            <div class="ai-results-card">
+              <div id="ai-results-text"></div>
+            </div>
+            <div style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+              <button class="btn-ghost" onclick="getAIRecommendations()" style="font-size:13px;">&#8635; Refresh Recommendations</button>
+              <span style="font-size:11px;color:var(--muted);">Based on your last 10 logged workouts and body metrics</span>
+            </div>
+          </div>
+
+          <div class="error-box" id="ai-error"></div>
+        </div>
+
+      </div><!-- /#panel-ai -->
 
     </div><!-- /.content -->
 

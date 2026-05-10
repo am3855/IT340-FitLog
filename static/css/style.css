@@ -876,5 +876,46 @@ nav ul li a.active { color: var(--text); }
    PANEL VISIBILITY
    ========================================================= */
 
-#panel-workouts, #panel-admin, #panel-settings { min-height: 200px; }
+#panel-workouts, #panel-admin, #panel-settings, #panel-ai { min-height: 200px; }
+
+/* =========================================================
+   AI RECOMMENDATIONS PANEL
+   ========================================================= */
+
+.ai-results-card {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.ai-results-card p.ai-para {
+  margin: 0 0 12px;
+}
+
+.ai-results-card p.ai-para:last-child {
+  margin-bottom: 0;
+}
+
+.ai-results-card strong {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.ai-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}
 

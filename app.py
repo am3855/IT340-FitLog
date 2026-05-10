@@ -21,6 +21,12 @@ try:
 except ImportError:
     REQUESTS_AVAILABLE = False
 
+try:
+    import anthropic as _anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fitlog-dev-secret-key')
 
@@ -856,6 +862,86 @@ def disable_2fa():
     )
     session['2fa_enabled'] = False
     return jsonify({'success': True, '2fa_enabled': False})
+
+
+# ---------------------------------------------------------------------------
+# AI recommendations route
+# ---------------------------------------------------------------------------
+
+@app.route('/api/ai/recommendations', methods=['POST'])
+def ai_recommendations():
+    err = require_login()
+    if err:
+        return err
+
+    if not ANTHROPIC_AVAILABLE:
+        return jsonify({'error': 'Anthropic package not installed. Run: pip install anthropic'}), 503
+
+    api_key = os.getenv('ANTHROPIC_API_KEY', '').strip()
+    if not api_key:
+        return jsonify({'error': 'AI recommendations are not configured yet. Add your ANTHROPIC_API_KEY to .env'}), 503
+
+    data     = request.get_json() or {}
+    workouts = data.get('workouts', [])
+    metrics  = data.get('metrics', {})
+
+    # Build workout summary (last 10 only)
+    last_10 = workouts[:10]
+    if last_10:
+        lines = []
+        for w in last_10:
+            line = f"- {w.get('date', 'N/A')}: {w.get('exercise', 'N/A')}, " \
+                   f"{w.get('sets', 0)}x{w.get('reps', 0)}"
+            if w.get('weight'):
+                line += f" @ {w.get('weight')} lbs"
+            if w.get('duration'):
+                line += f", {w.get('duration')} min"
+            lines.append(line)
+        workout_summary = '\n'.join(lines)
+    else:
+        workout_summary = 'No workouts logged yet.'
+
+    age      = metrics.get('age')
+    weight   = metrics.get('weight')
+    height   = metrics.get('height')
+    gender   = metrics.get('gender') or 'not specified'
+    unit_pref = metrics.get('unit_preference', 'imperial')
+    w_unit   = 'kg' if unit_pref == 'metric' else 'lbs'
+    h_unit   = 'cm' if unit_pref == 'metric' else 'inches'
+
+    profile_lines = []
+    if age:    profile_lines.append(f"- Age: {int(age)}")
+    if weight: profile_lines.append(f"- Weight: {weight} {w_unit}")
+    if height: profile_lines.append(f"- Height: {height} {h_unit}")
+    profile_lines.append(f"- Gender: {gender}")
+    profile_text = '\n'.join(profile_lines)
+
+    prompt = (
+        "You are a professional fitness coach. Based on the following user data, "
+        "provide personalized workout recommendations. Be specific, encouraging, "
+        "and practical. Format your response with clear sections.\n\n"
+        f"User Profile:\n{profile_text}\n\n"
+        f"Recent Workout History (last 10 workouts):\n{workout_summary}\n\n"
+        "Please provide:\n"
+        "1. An analysis of their current workout pattern (2-3 sentences)\n"
+        "2. 3 specific workout recommendations based on their history and body metrics\n"
+        "3. Suggested improvements to their current routine\n"
+        "4. A motivational note based on their progress\n\n"
+        "Keep the response concise, friendly and actionable."
+    )
+
+    try:
+        client  = _anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=1024,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        response_text = message.content[0].text
+        return jsonify({'success': True, 'recommendations': response_text})
+    except Exception as exc:
+        app.logger.error('Anthropic API error: %s', exc)
+        return jsonify({'error': 'Unable to generate recommendations right now, please try again later.'}), 502
 
 
 # ---------------------------------------------------------------------------
