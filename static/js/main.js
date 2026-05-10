@@ -14,6 +14,21 @@ var pending2FAEmail    = null;
 var cachedWorkouts     = [];
 
 // ---------------------------------------------------------------------------
+// Backend API URL
+// ---------------------------------------------------------------------------
+const API_BASE = "http://192.168.198.129:5000";
+
+async function apiFetch(endpoint, options = {}) {
+  options.credentials = "include";
+
+  if (!options.headers) {
+    options.headers = {};
+  }
+
+  return fetch(API_BASE + endpoint, options);
+}
+
+// ---------------------------------------------------------------------------
 // View / panel routing
 // ---------------------------------------------------------------------------
 function showView(name) {
@@ -117,7 +132,7 @@ function checkStrength(val) {
 // Auth
 // ---------------------------------------------------------------------------
 async function checkAuth() {
-  var res  = await fetch('/api/me');
+  var res  = await apiFetch('/api/me');
   var data = await res.json();
   if (data.logged_in) {
     setUser(data.user);
@@ -136,7 +151,7 @@ async function handleLogin() {
   var email    = document.getElementById('login-email').value.trim();
   var password = document.getElementById('login-password').value;
 
-  var res = await fetch('/api/login', {
+  var res = await apiFetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email, password: password }),
@@ -189,7 +204,7 @@ async function handleRegister() {
     showError('register-error', 'You must agree to the Terms of Service.'); return;
   }
 
-  var res = await fetch('/api/register', {
+  var res = await apiFetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -212,7 +227,7 @@ async function handleRegister() {
 }
 
 async function handleLogout() {
-  await fetch('/api/logout', { method: 'POST' });
+  await apiFetch('/api/logout', { method: 'POST' });
   currentUser     = null;
   pending2FAEmail = null;
   showView('login');
@@ -229,7 +244,7 @@ async function handleVerify2FA() {
     return;
   }
 
-  var res = await fetch('/api/2fa/verify', {
+  var res = await apiFetch('/api/2fa/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: pending2FAEmail, code: code }),
@@ -254,7 +269,7 @@ async function resendCode() {
   var link = document.getElementById('resend-link');
   if (link) { link.textContent = 'Sending…'; }
 
-  var res  = await fetch('/api/2fa/resend', { method: 'POST' });
+  var res  = await apiFetch('/api/2fa/resend', { method: 'POST' });
   var data = await res.json();
 
   if (!res.ok) {
@@ -316,7 +331,7 @@ async function handleWorkoutSubmit() {
     return;
   }
 
-  var res = await fetch('/api/workouts', {
+  var res = await apiFetch('/api/workouts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -345,7 +360,7 @@ async function handleWorkoutSubmit() {
 // Load & render workouts
 // ---------------------------------------------------------------------------
 async function loadWorkouts() {
-  var res = await fetch('/api/workouts');
+  var res = await apiFetch('/api/workouts');
   if (!res.ok) return;
   var data     = await res.json();
   var workouts = data.workouts || [];
@@ -492,7 +507,7 @@ function renderCharts(workouts) {
 // Admin panel
 // ---------------------------------------------------------------------------
 async function loadAdminPanel() {
-  var res = await fetch('/api/admin/users');
+  var res = await apiFetch('/api/admin/users');
   if (!res.ok) {
     showError('admin-users-tbody', 'Failed to load admin data.'); return;
   }
@@ -633,7 +648,7 @@ async function adminSaveEdit(btn) {
   var body = {};
   body[type] = val;
 
-  var res  = await fetch('/api/admin/users/' + uid + '/' + type, {
+  var res  = await apiFetch('/api/admin/users/' + uid + '/' + type, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -654,7 +669,7 @@ async function adminSaveEdit(btn) {
 
 async function adminToggle2FA(btn) {
   var uid = btn.dataset.uid;
-  var res = await fetch('/api/admin/users/' + uid + '/toggle-2fa', {
+  var res = await apiFetch('/api/admin/users/' + uid + '/toggle-2fa', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -703,7 +718,7 @@ async function adminSaveMetrics(btn) {
   if (weight) body.weight = weight;
   if (height) body.height = height;
 
-  var res  = await fetch('/api/admin/users/' + uid + '/metrics', {
+  var res  = await apiFetch('/api/admin/users/' + uid + '/metrics', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -782,7 +797,7 @@ function renderAdminWorkouts(users) {
 
 async function adminDeleteWorkout(id) {
   if (!confirm('Delete this workout?')) return;
-  var res = await fetch('/api/admin/workouts/' + id, { method: 'DELETE' });
+  var res = await apiFetch('/api/admin/workouts/' + id, { method: 'DELETE' });
   if (res.ok) {
     loadAdminPanel();
   } else {
@@ -827,7 +842,7 @@ async function saveEditModal() {
     date:     document.getElementById('modal-date').value,
   };
 
-  var res  = await fetch('/api/admin/workouts/' + id, {
+  var res  = await apiFetch('/api/admin/workouts/' + id, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -871,7 +886,7 @@ function onExerciseInput(val) {
 async function searchExercises(term) {
   var dropdown = document.getElementById('exercise-dropdown');
   try {
-    var res      = await fetch('/api/exercises/search?term=' + encodeURIComponent(term));
+    var res      = await apiFetch('/api/exercises/search?term=' + encodeURIComponent(term));
     var data     = await res.json();
     var exercises = data.exercises || [];
     if (!exercises.length) {
@@ -897,7 +912,7 @@ function selectExerciseFromDropdown(el) {
 
 async function loadMuscles() {
   try {
-    var res     = await fetch('/api/muscles');
+    var res     = await apiFetch('/api/muscles');
     var data    = await res.json();
     var muscles = data.muscles || [];
     var sel     = document.getElementById('muscle-select');
@@ -917,7 +932,7 @@ async function loadExercisesByMuscle(muscleId) {
   if (!muscleId) { list.innerHTML = ''; return; }
   list.innerHTML = '<div style="font-size:12px;color:var(--muted)">Loading…</div>';
   try {
-    var res       = await fetch('/api/exercises/by-muscle?muscle_id=' + encodeURIComponent(muscleId));
+    var res       = await apiFetch('/api/exercises/by-muscle?muscle_id=' + encodeURIComponent(muscleId));
     var data      = await res.json();
     var exercises  = data.exercises || [];
     if (!exercises.length) {
@@ -946,7 +961,7 @@ function selectExerciseCard(el) {
 // 2FA settings (email-based)
 // ---------------------------------------------------------------------------
 async function load2FAStatus() {
-  var res = await fetch('/api/2fa/status');
+  var res = await apiFetch('/api/2fa/status');
   if (!res.ok) { twoFaEnabled = false; renderTwoFAStatus(); return; }
   var data    = await res.json();
   twoFaEnabled = !!data['2fa_enabled'];
@@ -976,7 +991,7 @@ async function toggle2FA() {
   hideError('twofa-error');
   var enable  = !twoFaEnabled;
   var url     = enable ? '/api/2fa/enroll' : '/api/2fa/disable';
-  var res     = await fetch(url, {
+  var res     = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enable: enable }),
@@ -1301,7 +1316,7 @@ async function saveBodyMetrics() {
     return;
   }
 
-  var res  = await fetch('/api/user/metrics', {
+  var res  = await apiFetch('/api/user/metrics', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ age: age, weight: weight, height: height, unit_preference: unit, gender: gender }),
@@ -1348,7 +1363,7 @@ async function saveSettingsUsername() {
     return;
   }
 
-  var res  = await fetch('/api/user/username', {
+  var res  = await apiFetch('/api/user/username', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: username }),
@@ -1377,7 +1392,7 @@ async function saveSettingsEmail() {
     return;
   }
 
-  var res  = await fetch('/api/user/email', {
+  var res  = await apiFetch('/api/user/email', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email }),
@@ -1403,7 +1418,7 @@ async function settingsToggle2FA() {
   var enable = !(currentUser && currentUser['2fa_enabled']);
   var url    = enable ? '/api/2fa/enroll' : '/api/2fa/disable';
 
-  var res  = await fetch(url, {
+  var res  = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enable: enable }),
@@ -1451,7 +1466,7 @@ async function getAIRecommendations() {
   if (getBtn) getBtn.disabled = true;
 
   try {
-    var res = await fetch('/api/ai/recommendations', {
+    var res = await apiFetch('/api/ai/recommendations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
