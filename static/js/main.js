@@ -4,9 +4,14 @@
 var currentUser        = null;
 var volumeChart        = null;
 var frequencyChart     = null;
+var bmiChart           = null;
+var caloriesChart      = null;
+var hrChart            = null;
+var macroChart         = null;
 var twoFaEnabled       = false;
 var exerciseSearchTimer = null;
 var pending2FAEmail    = null;
+var cachedWorkouts     = [];
 
 // ---------------------------------------------------------------------------
 // View / panel routing
@@ -325,19 +330,26 @@ async function loadWorkouts() {
   if (!res.ok) return;
   var data     = await res.json();
   var workouts = data.workouts || [];
+  cachedWorkouts = workouts;
   renderWorkouts(workouts);
   updateStats(workouts);
   renderCharts(workouts);
+  renderHealthMetrics(workouts);
 }
 
 function renderWorkouts(workouts) {
-  var tbody = document.getElementById('workout-tbody');
+  var tbody    = document.getElementById('workout-tbody');
+  var weightKg = getWeightKg();
   if (!workouts.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No workouts yet. Log your first one!</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No workouts yet. Log your first one!</td></tr>';
     return;
   }
   tbody.innerHTML = workouts.map(function (w) {
     var volume = w.sets * w.reps * w.weight;
+    var calCell = '&mdash;';
+    if (weightKg && w.duration > 0) {
+      calCell = Math.round(5 * weightKg * (w.duration / 60)) + ' kcal';
+    }
     return '<tr>'
       + '<td>' + escapeHtml(w.date) + '</td>'
       + '<td><strong>' + escapeHtml(w.exercise) + '</strong></td>'
@@ -345,6 +357,7 @@ function renderWorkouts(workouts) {
       + '<td>' + escapeHtml(w.weight) + ' lbs</td>'
       + '<td>' + volume.toLocaleString() + ' lbs</td>'
       + '<td>' + (w.duration ? escapeHtml(w.duration) + ' min' : '&mdash;') + '</td>'
+      + '<td>' + calCell + '</td>'
       + '</tr>';
   }).join('');
 }
@@ -472,14 +485,25 @@ async function loadAdminPanel() {
 function renderAdminUsers(users) {
   var tbody = document.getElementById('admin-users-tbody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No users found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No users found.</td></tr>';
     return;
   }
   tbody.innerHTML = users.map(function (u) {
     var uid = escapeAttr(u.user_id);
+    // Compact metrics summary
+    var unitLbl = u.unit_preference === 'metric' ? 'kg / cm' : 'lbs / in';
+    var metricsSummary = (u.age || u.weight || u.height)
+      ? [
+          u.age    ? 'Age: '    + u.age    : null,
+          u.weight ? 'Wt: '    + u.weight : null,
+          u.height ? 'Ht: '    + u.height : null,
+          '(' + unitLbl + ')',
+        ].filter(Boolean).join(' | ')
+      : '&mdash;';
+
     return '<tr>'
       + '<td>' + escapeHtml(u.first_name) + ' ' + escapeHtml(u.last_name) + '</td>'
-      // Username cell with inline edit
+      // Username inline edit
       + '<td>'
         + '<div id="u-disp-' + uid + '">'
           + '<span id="u-txt-' + uid + '">' + escapeHtml(u.username) + '</span>'
@@ -496,7 +520,7 @@ function renderAdminUsers(users) {
           + ' data-uid="' + uid + '" data-type="username" onclick="adminCancelEdit(this)">Cancel</button>'
         + '</div>'
       + '</td>'
-      // Email cell with inline edit
+      // Email inline edit
       + '<td>'
         + '<div id="e-disp-' + uid + '">'
           + '<span id="e-txt-' + uid + '">' + escapeHtml(u.email) + '</span>'
@@ -518,6 +542,39 @@ function renderAdminUsers(users) {
         : '<span class="badge badge-blue">User</span>') + '</td>'
       + '<td>' + escapeHtml(u.workouts.length) + '</td>'
       + '<td>' + admin2FACell(uid, u['2fa_enabled']) + '</td>'
+      // Body Metrics inline edit
+      + '<td style="min-width:160px;">'
+        + '<div id="m-disp-' + uid + '">'
+          + '<span id="m-txt-' + uid + '" style="font-size:11px;color:var(--muted);">' + metricsSummary + '</span>'
+          + ' <button class="btn-ghost admin-btn" style="font-size:11px;padding:2px 6px;"'
+          + ' data-uid="' + uid + '" onclick="adminStartMetricsEdit(this)">Edit</button>'
+        + '</div>'
+        + '<div id="m-form-' + uid + '" style="display:none;">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px;">'
+            + '<input class="field-input" id="m-age-' + uid + '" type="number" min="1" placeholder="Age"'
+            + ' value="' + escapeAttr(u.age || '') + '" style="font-size:11px;padding:4px 6px;">'
+            + '<input class="field-input" id="m-weight-' + uid + '" type="number" min="0.1" step="0.1" placeholder="Weight"'
+            + ' value="' + escapeAttr(u.weight || '') + '" style="font-size:11px;padding:4px 6px;">'
+            + '<input class="field-input" id="m-height-' + uid + '" type="number" min="0.1" step="0.1" placeholder="Height"'
+            + ' value="' + escapeAttr(u.height || '') + '" style="font-size:11px;padding:4px 6px;">'
+            + '<select class="field-input" id="m-unit-' + uid + '" style="font-size:11px;padding:4px 6px;">'
+              + '<option value="imperial"' + (u.unit_preference !== 'metric' ? ' selected' : '') + '>Imperial</option>'
+              + '<option value="metric"'   + (u.unit_preference === 'metric'  ? ' selected' : '') + '>Metric</option>'
+            + '</select>'
+            + '<select class="field-input" id="m-gender-' + uid + '" style="font-size:11px;padding:4px 6px;">'
+              + '<option value=""'       + (!u.gender || u.gender === ''       ? ' selected' : '') + '>N/A</option>'
+              + '<option value="male"'   + (u.gender === 'male'   ? ' selected' : '') + '>Male</option>'
+              + '<option value="female"' + (u.gender === 'female' ? ' selected' : '') + '>Female</option>'
+            + '</select>'
+          + '</div>'
+          + '<div style="display:flex;gap:4px;">'
+            + '<button class="btn-primary admin-btn" style="font-size:11px;padding:3px 8px;"'
+            + ' data-uid="' + uid + '" onclick="adminSaveMetrics(this)">Save</button>'
+            + '<button class="btn-ghost admin-btn" style="font-size:11px;padding:3px 8px;"'
+            + ' data-uid="' + uid + '" onclick="adminCancelMetricsEdit(this)">Cancel</button>'
+          + '</div>'
+        + '</div>'
+      + '</td>'
       + '<td class="admin-feedback-cell"><span id="adminfb-' + uid + '"></span></td>'
       + '</tr>';
   }).join('');
@@ -600,6 +657,56 @@ function adminShowFeedback(uid, msg, success) {
   el.textContent = msg;
   el.style.color = success ? 'var(--green)' : 'var(--red)';
   setTimeout(function () { if (el) el.textContent = ''; }, 4000);
+}
+
+function adminStartMetricsEdit(btn) {
+  var uid = btn.dataset.uid;
+  document.getElementById('m-disp-' + uid).style.display = 'none';
+  document.getElementById('m-form-' + uid).style.display = '';
+}
+
+function adminCancelMetricsEdit(btn) {
+  var uid = btn.dataset.uid;
+  document.getElementById('m-form-' + uid).style.display = 'none';
+  document.getElementById('m-disp-' + uid).style.display = '';
+}
+
+async function adminSaveMetrics(btn) {
+  var uid    = btn.dataset.uid;
+  var age    = parseFloat(document.getElementById('m-age-'    + uid).value) || null;
+  var weight = parseFloat(document.getElementById('m-weight-' + uid).value) || null;
+  var height = parseFloat(document.getElementById('m-height-' + uid).value) || null;
+  var unit   = document.getElementById('m-unit-'   + uid).value;
+  var gender = document.getElementById('m-gender-' + uid).value;
+
+  var body = { unit_preference: unit, gender: gender };
+  if (age)    body.age    = age;
+  if (weight) body.weight = weight;
+  if (height) body.height = height;
+
+  var res  = await fetch('/api/admin/users/' + uid + '/metrics', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    adminShowFeedback(uid, data.error || 'Error saving metrics.', false);
+    return;
+  }
+
+  var unitLbl = unit === 'metric' ? 'kg / cm' : 'lbs / in';
+  var summary = [
+    age    ? 'Age: '  + age    : null,
+    weight ? 'Wt: '  + weight : null,
+    height ? 'Ht: '  + height : null,
+    '(' + unitLbl + ')',
+  ].filter(Boolean).join(' | ');
+  document.getElementById('m-txt-' + uid).textContent = summary;
+  document.getElementById('m-form-' + uid).style.display = 'none';
+  document.getElementById('m-disp-' + uid).style.display = '';
+  adminShowFeedback(uid, 'Metrics updated.', true);
 }
 
 function renderAdminWorkouts(users) {
@@ -868,6 +975,256 @@ async function toggle2FA() {
 }
 
 // ---------------------------------------------------------------------------
+// Health metrics helpers
+// ---------------------------------------------------------------------------
+function getWeightKg() {
+  if (!currentUser || !currentUser.weight) return null;
+  return currentUser.unit_preference === 'metric'
+    ? currentUser.weight
+    : currentUser.weight / 2.205;
+}
+
+function getHeightCm() {
+  if (!currentUser || !currentUser.height) return null;
+  return currentUser.unit_preference === 'metric'
+    ? currentUser.height
+    : currentUser.height * 2.54;
+}
+
+function renderHealthMetrics(workouts) {
+  var prompt  = document.getElementById('health-metrics-prompt');
+  var content = document.getElementById('health-metrics-content');
+  if (!prompt || !content) return;
+
+  var u = currentUser;
+  if (!u || !u.age || !u.weight || !u.height) {
+    prompt.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+
+  prompt.classList.add('hidden');
+  content.classList.remove('hidden');
+  renderBMI();
+  renderCaloriesChart(workouts);
+  renderHRZones();
+  updateBMRDisplay();
+}
+
+function renderBMI() {
+  var u   = currentUser;
+  var bmi;
+  if (u.unit_preference === 'metric') {
+    var hm = u.height / 100;
+    bmi = u.weight / (hm * hm);
+  } else {
+    bmi = (u.weight / (u.height * u.height)) * 703;
+  }
+  bmi = Math.round(bmi * 10) / 10;
+
+  document.getElementById('bmi-value').textContent = bmi;
+  var badge = document.getElementById('bmi-badge');
+  var label, color;
+  if      (bmi < 18.5) { label = 'Underweight'; color = 'var(--blue)'; }
+  else if (bmi < 25)   { label = 'Normal';       color = 'var(--green)'; }
+  else if (bmi < 30)   { label = 'Overweight';   color = '#ffd740'; }
+  else                 { label = 'Obese';         color = 'var(--red)'; }
+  badge.textContent = label;
+  badge.style.color = color;
+
+  if (bmiChart) { bmiChart.destroy(); bmiChart = null; }
+  var bmiVal = bmi;
+  bmiChart = new Chart(document.getElementById('bmi-chart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['BMI Scale'],
+      datasets: [
+        { label: 'Underweight (< 18.5)', data: [18.5], backgroundColor: 'rgba(79,168,255,0.55)',  stack: 'z' },
+        { label: 'Normal (18.5–24.9)',   data: [6.4],  backgroundColor: 'rgba(184,249,79,0.55)', stack: 'z' },
+        { label: 'Overweight (25–29.9)', data: [5],    backgroundColor: 'rgba(255,215,64,0.55)', stack: 'z' },
+        { label: 'Obese (30+)',          data: [10],   backgroundColor: 'rgba(255,82,82,0.55)',  stack: 'z' },
+      ],
+    },
+    plugins: [{
+      afterDraw: function (chart) {
+        var xScale = chart.scales.x;
+        var yScale = chart.scales.y;
+        var x   = xScale.getPixelForValue(bmiVal);
+        var ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, yScale.top - 4);
+        ctx.lineTo(x, yScale.bottom + 4);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+        ctx.fillStyle   = '#ffffff';
+        ctx.font        = 'bold 11px DM Sans';
+        ctx.textAlign   = 'center';
+        ctx.fillText('▲ ' + bmiVal, x, yScale.top - 8);
+        ctx.restore();
+      },
+    }],
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, max: 40, ticks: { color: '#777', font: { family: 'DM Sans' } }, grid: { color: '#2a2a2a' } },
+        y: { stacked: true, ticks: { display: false }, grid: { display: false } },
+      },
+      plugins: {
+        legend: { labels: { color: '#e8e8e8', font: { family: 'DM Sans' }, boxWidth: 10, padding: 10 } },
+        tooltip: { callbacks: { label: function (ctx) { return ctx.dataset.label; } } },
+      },
+    },
+  });
+}
+
+function renderCaloriesChart(workouts) {
+  var weightKg = getWeightKg();
+  if (caloriesChart) { caloriesChart.destroy(); caloriesChart = null; }
+  if (!weightKg) return;
+
+  var sorted = workouts.slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+  var labels = [], cals = [];
+  sorted.forEach(function (w) {
+    if (w.duration > 0) {
+      labels.push(w.date);
+      cals.push(Math.round(5 * weightKg * (w.duration / 60)));
+    }
+  });
+
+  if (!labels.length) return;
+
+  caloriesChart = new Chart(document.getElementById('calories-chart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Est. Calories Burned (kcal)',
+        data: cals,
+        backgroundColor: 'rgba(184,249,79,0.55)',
+        borderColor: '#b8f94f',
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#e8e8e8', font: { family: 'DM Sans' } } } },
+      scales: {
+        x: { ticks: { color: '#777', font: { family: 'DM Sans' } }, grid: { color: '#2a2a2a' } },
+        y: { ticks: { color: '#777', font: { family: 'DM Sans' } }, grid: { color: '#2a2a2a' }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+function renderHRZones() {
+  var age   = currentUser.age;
+  var maxHR = 220 - age;
+  var zones = [
+    { name: 'Warm Up',  lo: 0.50, hi: 0.60, color: 'rgba(79,168,255,0.65)' },
+    { name: 'Fat Burn', lo: 0.60, hi: 0.70, color: 'rgba(184,249,79,0.65)' },
+    { name: 'Cardio',   lo: 0.70, hi: 0.80, color: 'rgba(255,215,64,0.65)' },
+    { name: 'Peak',     lo: 0.80, hi: 0.90, color: 'rgba(255,82,82,0.65)'  },
+  ];
+
+  var tbody = document.getElementById('hr-zones-tbody');
+  if (tbody) {
+    tbody.innerHTML = zones.map(function (z) {
+      return '<tr>'
+        + '<td>' + escapeHtml(z.name) + ' Zone</td>'
+        + '<td>' + Math.round(z.lo * maxHR) + ' &ndash; ' + Math.round(z.hi * maxHR) + ' BPM</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  if (hrChart) { hrChart.destroy(); hrChart = null; }
+  hrChart = new Chart(document.getElementById('hr-chart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: [''],
+      datasets: zones.map(function (z) {
+        return {
+          label: z.name + ' Zone',
+          data: [Math.round((z.hi - z.lo) * maxHR)],
+          backgroundColor: z.color,
+          stack: 'hr',
+        };
+      }),
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, ticks: { color: '#777', font: { family: 'DM Sans' } }, grid: { color: '#2a2a2a' } },
+        y: { stacked: true, ticks: { display: false }, grid: { display: false } },
+      },
+      plugins: {
+        legend: { labels: { color: '#e8e8e8', font: { family: 'DM Sans' }, boxWidth: 10, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) {
+              var z  = zones[ctx.datasetIndex];
+              return z.name + ': ' + Math.round(z.lo * maxHR) + '–' + Math.round(z.hi * maxHR) + ' BPM';
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+function updateBMRDisplay() {
+  var u = currentUser;
+  if (!u || !u.age || !u.weight || !u.height) return;
+
+  var weightKg = getWeightKg();
+  var heightCm = getHeightCm();
+  var bmr = u.gender === 'female'
+    ? (10 * weightKg) + (6.25 * heightCm) - (5 * u.age) - 161
+    : (10 * weightKg) + (6.25 * heightCm) - (5 * u.age) + 5;
+
+  var actEl      = document.getElementById('activity-level');
+  var multiplier = actEl ? parseFloat(actEl.value) : 1.55;
+  var tdee       = Math.round(bmr * multiplier);
+
+  var caloriesEl = document.getElementById('bmr-calories');
+  var macroEl    = document.getElementById('bmr-macros-text');
+  if (caloriesEl) caloriesEl.textContent = tdee.toLocaleString();
+
+  var protein = Math.round((tdee * 0.30) / 4);
+  var carbs   = Math.round((tdee * 0.40) / 4);
+  var fat     = Math.round((tdee * 0.30) / 9);
+  if (macroEl) macroEl.textContent = 'P: ' + protein + 'g  |  C: ' + carbs + 'g  |  F: ' + fat + 'g';
+
+  if (macroChart) { macroChart.destroy(); macroChart = null; }
+  var macroCtx = document.getElementById('macro-chart');
+  if (!macroCtx) return;
+  macroChart = new Chart(macroCtx.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Protein (' + protein + 'g)', 'Carbs (' + carbs + 'g)', 'Fat (' + fat + 'g)'],
+      datasets: [{
+        data: [tdee * 0.30, tdee * 0.40, tdee * 0.30],
+        backgroundColor: ['rgba(184,249,79,0.7)', 'rgba(79,168,255,0.7)', 'rgba(255,215,64,0.7)'],
+        borderColor:     ['#b8f94f', '#4fa8ff', '#ffd740'],
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#e8e8e8', font: { family: 'DM Sans' }, boxWidth: 12 } } },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Settings panel
 // ---------------------------------------------------------------------------
 function loadSettings() {
@@ -890,8 +1247,65 @@ function loadSettings() {
   document.getElementById('settings-username-msg').textContent = '';
   document.getElementById('settings-email-msg').textContent    = '';
   document.getElementById('settings-2fa-msg').textContent      = '';
+  document.getElementById('settings-metrics-msg').textContent  = '';
+
+  // Body metrics
+  var unitPref = u.unit_preference || 'imperial';
+  document.getElementById('unit-imperial').checked = (unitPref !== 'metric');
+  document.getElementById('unit-metric').checked   = (unitPref === 'metric');
+  onUnitChange();
+  document.getElementById('settings-age').value    = u.age    != null ? u.age    : '';
+  document.getElementById('settings-weight').value = u.weight != null ? u.weight : '';
+  document.getElementById('settings-height').value = u.height != null ? u.height : '';
+  document.getElementById('settings-gender').value = u.gender || '';
 
   updateSettings2FADisplay();
+}
+
+function onUnitChange() {
+  var isMetric = document.getElementById('unit-metric').checked;
+  document.getElementById('weight-label').textContent = 'Weight (' + (isMetric ? 'kg' : 'lbs') + ')';
+  document.getElementById('height-label').textContent = 'Height (' + (isMetric ? 'cm' : 'inches') + ')';
+}
+
+async function saveBodyMetrics() {
+  var msgEl  = document.getElementById('settings-metrics-msg');
+  var age    = parseFloat(document.getElementById('settings-age').value);
+  var weight = parseFloat(document.getElementById('settings-weight').value);
+  var height = parseFloat(document.getElementById('settings-height').value);
+  var unit   = document.querySelector('input[name="unit-pref"]:checked').value;
+  var gender = document.getElementById('settings-gender').value;
+
+  if (!age || !weight || !height || age <= 0 || weight <= 0 || height <= 0) {
+    msgEl.textContent = 'Please enter valid age, weight, and height.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  var res  = await fetch('/api/user/metrics', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ age: age, weight: weight, height: height, unit_preference: unit, gender: gender }),
+  });
+  var data = await res.json();
+
+  if (!res.ok) {
+    msgEl.textContent = data.error || 'Failed to save body metrics.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  currentUser.age             = age;
+  currentUser.weight          = weight;
+  currentUser.height          = height;
+  currentUser.unit_preference = unit;
+  currentUser.gender          = gender;
+
+  msgEl.textContent = 'Body metrics saved successfully.';
+  msgEl.style.color = 'var(--green)';
+
+  renderHealthMetrics(cachedWorkouts);
+  renderWorkouts(cachedWorkouts);
 }
 
 function updateSettings2FADisplay() {

@@ -221,10 +221,11 @@
               <th>Weight</th>
               <th>Volume</th>
               <th>Duration</th>
+              <th>Est. Calories</th>
             </tr>
           </thead>
           <tbody id="workout-tbody">
-            <tr><td colspan="6" class="empty-row">No workouts yet. Log your first one!</td></tr>
+            <tr><td colspan="7" class="empty-row">No workouts yet. Log your first one!</td></tr>
           </tbody>
         </table>
 
@@ -242,6 +243,80 @@
             <canvas id="frequency-chart"></canvas>
           </div>
         </div>
+
+        <!-- Health Metrics -->
+        <div id="health-metrics-section" style="margin-top:36px;">
+          <div id="health-metrics-prompt" class="hidden" style="padding:24px;text-align:center;background:var(--charcoal);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:14px;">
+            Add your age, weight, and height in <a href="#" onclick="showPanel('settings');return false;" style="color:var(--green);">Settings</a> to see your health metrics.
+          </div>
+
+          <div id="health-metrics-content" class="hidden">
+            <div class="section-title" style="font-size:20px;margin-bottom:20px;">Health Metrics</div>
+
+            <!-- BMI -->
+            <div class="metric-section">
+              <div class="metric-section-title">Body Mass Index (BMI)</div>
+              <div class="metric-cards-row">
+                <div class="metric-card">
+                  <div class="metric-number" id="bmi-value">&mdash;</div>
+                  <div class="metric-badge" id="bmi-badge"></div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:1px;">BMI</div>
+                </div>
+              </div>
+              <div class="chart-container" style="margin-top:16px;max-height:110px;">
+                <canvas id="bmi-chart" style="max-height:80px;"></canvas>
+              </div>
+            </div>
+
+            <!-- Calories Burned -->
+            <div class="metric-section" style="margin-top:28px;">
+              <div class="metric-section-title">Estimated Calories Burned Per Workout</div>
+              <div class="chart-container" style="margin-top:12px;">
+                <canvas id="calories-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Heart Rate Zones -->
+            <div class="metric-section" style="margin-top:28px;">
+              <div class="metric-section-title">Target Heart Rate Zones</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px;align-items:start;">
+                <table class="workout-table">
+                  <thead>
+                    <tr><th>Zone</th><th>BPM Range</th></tr>
+                  </thead>
+                  <tbody id="hr-zones-tbody"></tbody>
+                </table>
+                <div class="chart-container" style="max-height:160px;">
+                  <canvas id="hr-chart" style="max-height:120px;"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recommended Daily Calories -->
+            <div class="metric-section" style="margin-top:28px;margin-bottom:36px;">
+              <div class="metric-section-title">Recommended Daily Calories</div>
+              <div class="field-group" style="max-width:300px;margin-top:12px;margin-bottom:16px;">
+                <label class="field-label">Activity Level</label>
+                <select class="field-input" id="activity-level" onchange="updateBMRDisplay()">
+                  <option value="1.2">Sedentary (little or no exercise)</option>
+                  <option value="1.375">Lightly Active (1&ndash;3 days/week)</option>
+                  <option value="1.55" selected>Moderately Active (3&ndash;5 days/week)</option>
+                  <option value="1.725">Very Active (6&ndash;7 days/week)</option>
+                </select>
+              </div>
+              <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;">
+                <div class="metric-card" style="min-width:160px;">
+                  <div class="metric-number" id="bmr-calories">&mdash;</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px;">cal / day</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;" id="bmr-macros-text"></div>
+                </div>
+                <div class="chart-container" style="max-height:220px;">
+                  <canvas id="macro-chart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /#health-metrics-section -->
 
       </div><!-- /#panel-workouts -->
 
@@ -262,11 +337,12 @@
               <th>Role</th>
               <th>Workouts</th>
               <th>2FA</th>
+              <th>Body Metrics</th>
               <th>Feedback</th>
             </tr>
           </thead>
           <tbody id="admin-users-tbody">
-            <tr><td colspan="7" class="empty-row">Loading&hellip;</td></tr>
+            <tr><td colspan="8" class="empty-row">Loading&hellip;</td></tr>
           </tbody>
         </table>
 
@@ -345,6 +421,52 @@
           <div class="settings-msg" id="settings-2fa-msg"></div>
           <button class="btn-ghost" id="settings-2fa-btn" style="margin-top:12px;width:100%;font-size:13px;" onclick="settingsToggle2FA()">Loading&hellip;</button>
         </div>
+        <!-- Body Metrics -->
+        <div class="settings-card">
+          <div class="settings-card-title">Body Metrics</div>
+
+          <div class="field-group" style="margin-bottom:14px;">
+            <label class="field-label">Units</label>
+            <div class="metrics-unit-row">
+              <label class="metrics-radio">
+                <input type="radio" name="unit-pref" id="unit-imperial" value="imperial" onchange="onUnitChange()" checked>
+                <span>Imperial (lbs, inches)</span>
+              </label>
+              <label class="metrics-radio">
+                <input type="radio" name="unit-pref" id="unit-metric" value="metric" onchange="onUnitChange()">
+                <span>Metric (kg, cm)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-group" style="margin-bottom:14px;">
+            <label class="field-label" for="settings-gender">Gender</label>
+            <select class="field-input" id="settings-gender">
+              <option value="">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+
+          <div class="metrics-inputs-grid">
+            <div class="field-group" style="margin-bottom:8px;">
+              <label class="field-label" id="settings-age-label" for="settings-age">Age (years)</label>
+              <input class="field-input" id="settings-age" type="number" min="1" max="120" placeholder="22">
+            </div>
+            <div class="field-group" style="margin-bottom:8px;">
+              <label class="field-label" id="weight-label" for="settings-weight">Weight (lbs)</label>
+              <input class="field-input" id="settings-weight" type="number" min="0.1" step="0.1" placeholder="180">
+            </div>
+            <div class="field-group" style="margin-bottom:8px;">
+              <label class="field-label" id="height-label" for="settings-height">Height (inches)</label>
+              <input class="field-input" id="settings-height" type="number" min="0.1" step="0.1" placeholder="71">
+            </div>
+          </div>
+
+          <div class="settings-msg" id="settings-metrics-msg"></div>
+          <button class="btn-primary" style="margin-top:10px;" onclick="saveBodyMetrics()">Save Body Metrics</button>
+        </div>
+
       </div><!-- /#panel-settings -->
 
     </div><!-- /.content -->

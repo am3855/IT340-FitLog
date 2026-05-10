@@ -796,6 +796,83 @@ nav ul li a.active { color: var(--text); }
 }
 
 /* =========================================================
+   HEALTH METRICS
+   ========================================================= */
+
+.metric-section { }
+
+.metric-section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.metric-cards-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.metric-card {
+  background: var(--charcoal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  text-align: center;
+  min-width: 120px;
+}
+
+.metric-number {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  letter-spacing: 1px;
+  color: var(--green);
+  line-height: 1;
+}
+
+.metric-badge {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* =========================================================
+   BODY METRICS SETTINGS INPUTS
+   ========================================================= */
+
+.metrics-inputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.metrics-unit-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.metrics-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.metrics-radio input[type="radio"] {
+  accent-color: var(--green);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* =========================================================
    PANEL VISIBILITY
    ========================================================= */
 
