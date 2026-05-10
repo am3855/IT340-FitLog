@@ -144,14 +144,19 @@ def _create_session(user):
 def _serialize_user(user):
     created_at = user.get('created_at')
     return {
-        'user_id':    user.get('user_id', ''),
-        'username':   user.get('username', ''),
-        'first_name': user['first_name'],
-        'last_name':  user['last_name'],
-        'email':      user['email'],
-        'is_admin':   user.get('is_admin', False),
-        '2fa_enabled': user.get('2fa_enabled', False),
-        'created_at': created_at.isoformat() if created_at else None,
+        'user_id':         user.get('user_id', ''),
+        'username':        user.get('username', ''),
+        'first_name':      user['first_name'],
+        'last_name':       user['last_name'],
+        'email':           user['email'],
+        'is_admin':        user.get('is_admin', False),
+        '2fa_enabled':     user.get('2fa_enabled', False),
+        'created_at':      created_at.isoformat() if created_at else None,
+        'age':             user.get('age'),
+        'weight':          user.get('weight'),
+        'height':          user.get('height'),
+        'unit_preference': user.get('unit_preference', 'imperial'),
+        'gender':          user.get('gender', ''),
     }
 
 
@@ -361,14 +366,19 @@ def admin_get_users():
     for u in users:
         user_workouts = list(get_workouts().find({'user_email': u['email']}))
         result.append({
-            'user_id': u.get('user_id', ''),
-            'username': u.get('username', ''),
-            'email': u.get('email', ''),
-            'first_name': u.get('first_name', ''),
-            'last_name': u.get('last_name', ''),
-            'is_admin': u.get('is_admin', False),
-            '2fa_enabled': u.get('2fa_enabled', False),
-            'workouts': [serialize_workout(w) for w in user_workouts],
+            'user_id':         u.get('user_id', ''),
+            'username':        u.get('username', ''),
+            'email':           u.get('email', ''),
+            'first_name':      u.get('first_name', ''),
+            'last_name':       u.get('last_name', ''),
+            'is_admin':        u.get('is_admin', False),
+            '2fa_enabled':     u.get('2fa_enabled', False),
+            'age':             u.get('age'),
+            'weight':          u.get('weight'),
+            'height':          u.get('height'),
+            'unit_preference': u.get('unit_preference', 'imperial'),
+            'gender':          u.get('gender', ''),
+            'workouts':        [serialize_workout(w) for w in user_workouts],
         })
     return jsonify({'users': result})
 
@@ -675,6 +685,81 @@ def user_update_email():
     get_workouts().update_many({'user_email': old_email}, {'$set': {'user_email': new_email}})
     session['email'] = new_email
     return jsonify({'success': True, 'email': new_email})
+
+
+@app.route('/api/user/metrics', methods=['PUT'])
+def user_update_metrics():
+    err = require_login()
+    if err:
+        return err
+
+    data    = request.get_json() or {}
+    updates = {}
+
+    for field in ('age', 'weight', 'height'):
+        if field in data:
+            try:
+                val = float(data[field])
+                if val <= 0:
+                    return jsonify({'error': f'{field.capitalize()} must be a positive number.'}), 400
+                updates[field] = val
+            except (ValueError, TypeError):
+                return jsonify({'error': f'{field.capitalize()} must be a number.'}), 400
+
+    if 'unit_preference' in data:
+        if data['unit_preference'] not in ('imperial', 'metric'):
+            return jsonify({'error': 'unit_preference must be "imperial" or "metric".'}), 400
+        updates['unit_preference'] = data['unit_preference']
+
+    if 'gender' in data:
+        if data['gender'] not in ('male', 'female', ''):
+            return jsonify({'error': 'Invalid gender value.'}), 400
+        updates['gender'] = data['gender']
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided.'}), 400
+
+    get_users().update_one({'email': session['email']}, {'$set': updates})
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/users/<user_id>/metrics', methods=['PUT'])
+def admin_update_metrics(user_id):
+    err = require_admin()
+    if err:
+        return err
+
+    if not get_users().find_one({'user_id': user_id}):
+        return jsonify({'error': 'User not found.'}), 404
+
+    data    = request.get_json() or {}
+    updates = {}
+
+    for field in ('age', 'weight', 'height'):
+        if field in data:
+            try:
+                val = float(data[field])
+                if val <= 0:
+                    return jsonify({'error': f'{field.capitalize()} must be a positive number.'}), 400
+                updates[field] = val
+            except (ValueError, TypeError):
+                return jsonify({'error': f'{field.capitalize()} must be a number.'}), 400
+
+    if 'unit_preference' in data:
+        if data['unit_preference'] not in ('imperial', 'metric'):
+            return jsonify({'error': 'unit_preference must be "imperial" or "metric".'}), 400
+        updates['unit_preference'] = data['unit_preference']
+
+    if 'gender' in data:
+        if data['gender'] not in ('male', 'female', ''):
+            return jsonify({'error': 'Invalid gender value.'}), 400
+        updates['gender'] = data['gender']
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided.'}), 400
+
+    get_users().update_one({'user_id': user_id}, {'$set': updates})
+    return jsonify({'success': True})
 
 
 # ---------------------------------------------------------------------------
