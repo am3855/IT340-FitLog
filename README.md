@@ -1,6 +1,7 @@
 # FitLog — IT340 System Administration
 
-A web-based fitness logging application built for the IT340 System Administration course. The app handles user registration and login, and is designed to run across 3 application instances and 1 router instance connected through a VLAN.
+A web-based fitness logging application built for the IT340 System Administration course. The app handles user registration and login, and is designed to run across 3 application instances connected through a VLAN.
+The application includes graphs to view real-time data, AI reccomendation based on user-submitted data, admin accounts that can manipulate submitted info, and a search feature for user properties. 
 
 ---
 
@@ -12,6 +13,9 @@ IT340-FitLog/
 ├── requirements.txt        # Python dependencies
 ├── docker-compose.yml      # Local dev environment (MongoDB + app container)
 ├── Dockerfile              # Container definition for the app
+├── .dockerignore
+├── .env.example
+├── frontend.py
 ├── README.md
 ├── .gitignore
 ├── static/
@@ -36,6 +40,12 @@ IT340-FitLog/
 **Werkzeug** — password hashing (included with Flask); passwords are never stored in plaintext
 
 **HTML / CSS / JavaScript** — `index.html` renders all three views (login, register, dashboard); `style.css` styles them; `main.js` handles view switching, form validation, and all AJAX API calls
+
+**rsyslog** - tool for centralized logging
+
+**Wger API** - open source API for workout management
+
+**Anthropic API** - API for implementing AI feature
 
 ---
 
